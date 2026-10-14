@@ -9,6 +9,7 @@ from importlib import resources
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from starlette.applications import Starlette
+from starlette.middleware import Middleware
 from starlette.routing import Route
 
 from .auth.client import Resolver, system_resolver
@@ -27,6 +28,7 @@ class AppState:
     store: Store
     resolver: Resolver = system_resolver
     clock: Callable[[], datetime] = lambda: datetime.now(UTC)
+    store_problem: str | None = None
     jinja: Environment = field(init=False)
 
     def __post_init__(self) -> None:
@@ -46,9 +48,18 @@ class AppState:
 
 
 def create_app(state: AppState) -> Starlette:
-    from . import routes_auth, routes_micropub
+    from . import routes_auth, routes_micropub, routes_system
+    from .logs import AccessLogMiddleware
 
-    routes: list[Route] = [*routes_auth.routes(), *routes_micropub.routes()]
-    app = Starlette(routes=routes)
+    routes: list[Route] = [
+        *routes_system.routes(),
+        *routes_auth.routes(),
+        *routes_micropub.routes(),
+    ]
+    app = Starlette(
+        routes=routes,
+        middleware=[Middleware(AccessLogMiddleware)],
+        lifespan=routes_system.lifespan,
+    )
     app.state.s = state
     return app
