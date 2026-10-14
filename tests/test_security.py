@@ -75,3 +75,24 @@ def test_the_ui_forms_can_carry_photos(client, state, site):
         files=[("file", ("a.jpg", b"x" * 100_000, "image/jpeg"))],
     )
     assert r.status_code != 413
+
+
+# --- framing ----------------------------------------------------------------------------------------
+def test_no_page_can_be_framed(client):
+    params = {
+        "response_type": "code",
+        "client_id": "https://app.example/",
+        "redirect_uri": "https://app.example/cb",
+        "state": "s",
+    }
+    consent = client.get(client.get("/auth", params=params).headers["location"])
+    assert consent.status_code == 200
+    for r in (consent, client.get("/auth"), client.get("/login"), client.get("/")):
+        assert r.headers["x-frame-options"] == "DENY"
+        assert "frame-ancestors 'none'" in r.headers["content-security-policy"]
+
+
+def test_the_consent_page_can_still_redirect_to_the_client(client):
+    # a form-action CSP would block the redirect to the app's redirect_uri; it must not be set here
+    r = client.get("/auth")
+    assert "form-action" not in r.headers["content-security-policy"]

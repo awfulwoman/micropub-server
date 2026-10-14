@@ -12,7 +12,7 @@ from urllib.parse import urljoin, urlsplit
 import httpx
 
 from ..app import AppState
-from ..auth.client import FetchError, assert_fetchable
+from ..auth.client import FetchError, assert_fetchable, guarded_client
 from ..publish import MicropubError, update_post
 from .base import NotApplicable, SyndicationError
 
@@ -65,7 +65,7 @@ def _fetcher(s: AppState, post_url: str):
         if row:
             return await s.store.read(row[0]["path"]), posixpath.basename(row[0]["path"])
         assert_fetchable(url, resolver=s.resolver)
-        async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
+        async with guarded_client(s.resolver, timeout=30, follow_redirects=False) as client:
             response = await client.get(url)
         if response.status_code != 200:
             raise SyndicationError(f"could not fetch {url}: HTTP {response.status_code}")

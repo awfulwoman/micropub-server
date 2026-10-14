@@ -116,3 +116,12 @@ def test_home_redirects_by_state(client):
     login(client)
     r = client.get("/")
     assert r.status_code == 303 and r.headers["location"] == "/posts"
+
+
+def test_signing_out_ends_every_session_not_just_this_cookie(client):
+    login(client)
+    stolen = client.cookies.get("ms_session")
+    page = client.get("/posts").text
+    client.post("/logout", data={"csrf": csrf_of(page)})
+    client.cookies.set("ms_session", stolen)  # an attacker replays the old cookie
+    assert client.get("/posts").status_code == 303

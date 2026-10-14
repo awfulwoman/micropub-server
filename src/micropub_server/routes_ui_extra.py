@@ -16,7 +16,7 @@ from starlette.responses import JSONResponse, RedirectResponse, Response
 from starlette.routing import Route
 
 from . import ui
-from .auth.client import FetchError, assert_fetchable
+from .auth.client import FetchError, assert_fetchable, guarded_client
 from .http import state_of
 from .media import MediaError, process_upload
 from .media_service import delete_media, prepare_media, record_media
@@ -247,7 +247,7 @@ class _Head(HTMLParser):
 
 async def _fetch_preview(s, url: str) -> dict[str, str]:
     headers = {"Accept": "text/html", "User-Agent": "micropub-server link preview"}
-    async with httpx.AsyncClient(timeout=6, follow_redirects=False) as client:
+    async with guarded_client(s.resolver, timeout=6, follow_redirects=False) as client:
         for _ in range(4):  # every hop is checked, so a redirect cannot lead inside
             assert_fetchable(url, resolver=s.resolver)
             response = await client.get(url, headers=headers)

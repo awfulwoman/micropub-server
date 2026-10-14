@@ -73,6 +73,7 @@ async def logout(request: Request, session: dict[str, Any]) -> Response:
     form = await request.form()
     if not ui.csrf_ok(session, form.get("csrf")):
         return Response("Invalid form token", status_code=403)
+    ui.end_all_sessions(request)
     response = RedirectResponse("/login", status_code=303)
     ui.end_session(response)
     return response

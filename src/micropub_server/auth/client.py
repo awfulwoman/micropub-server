@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import asyncio
 import ipaddress
 import socket
 from collections.abc import Callable
 from typing import Any
 from urllib.parse import urlsplit
 
+import httpcore
 import httpx
 import mf2py
 
@@ -58,9 +60,57 @@ def assert_fetchable(url: str, *, resolver: Resolver = system_resolver) -> None:
             raise FetchError(f"refusing to fetch {url}: {address} is not a public address")
 
 
+class GuardedBackend(httpcore.AsyncNetworkBackend):
+    """Checks the address at the moment of connecting, then connects to that very address.
+
+    Resolving a name to check it and again to connect lets a hostile DNS server answer "public"
+    the first time and "internal" the second (DNS rebinding). Here there is only one answer.
+    """
+
+    def __init__(self, inner: httpcore.AsyncNetworkBackend, resolver: Resolver = system_resolver):
+        self._inner = inner
+        self._resolver = resolver
+
+    async def connect_tcp(self, host, port, timeout=None, local_address=None, socket_options=None):
+        try:
+            ipaddress.ip_address(host)
+            addresses = [host]
+        except ValueError:
+            addresses = await asyncio.to_thread(self._resolver, host)
+        if not addresses:
+            raise FetchError(f"cannot resolve {host}")
+        for address in addresses:
+            if _blocked(address):
+                raise FetchError(
+                    f"refusing to connect to {host}: {address} is not a public address"
+                )
+        last: Exception | None = None
+        for address in addresses:
+            try:
+                return await self._inner.connect_tcp(
+                    address, port, timeout, local_address, socket_options
+                )
+            except httpcore.ConnectError as exc:
+                last = exc
+        raise last  # type: ignore[misc]
+
+    async def connect_unix_socket(self, path, timeout=None, socket_options=None):
+        raise FetchError("unix sockets are not allowed")
+
+    async def sleep(self, seconds: float) -> None:
+        await self._inner.sleep(seconds)
+
+
+def guarded_client(resolver: Resolver = system_resolver, **kwargs) -> httpx.AsyncClient:
+    """An HTTP client that cannot be tricked into connecting to a private address."""
+    transport = httpx.AsyncHTTPTransport()
+    transport._pool._network_backend = GuardedBackend(transport._pool._network_backend, resolver)
+    return httpx.AsyncClient(transport=transport, **kwargs)
+
+
 async def _fetch(url: str, resolver: Resolver) -> httpx.Response:
     assert_fetchable(url, resolver=resolver)
-    async with httpx.AsyncClient(timeout=FETCH_TIMEOUT, follow_redirects=False) as client:
+    async with guarded_client(resolver, timeout=FETCH_TIMEOUT, follow_redirects=False) as client:
         try:
             response = await client.get(url, headers={"Accept": "text/html, application/json"})
         except httpx.HTTPError as exc:

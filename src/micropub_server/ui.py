@@ -25,6 +25,22 @@ def _serializer(request: Request) -> URLSafeTimedSerializer:
     return URLSafeTimedSerializer(state_of(request).settings.secret, salt="micropub-ui-session")
 
 
+_EPOCH_KEY = "session-epoch"
+
+
+def _epoch(request: Request) -> int:
+    rows = state_of(request).db.query("SELECT value FROM cache WHERE key = ?", (_EPOCH_KEY,))
+    return int(rows[0][0]) if rows else 0
+
+
+def end_all_sessions(request: Request) -> None:
+    """Make every cookie issued so far worthless. There is one user, so this is all signing out needs."""
+    state_of(request).db.execute(
+        "INSERT OR REPLACE INTO cache (key, value, expires_at) VALUES (?, ?, '9999-12-31T00:00:00')",
+        (_EPOCH_KEY, str(_epoch(request) + 1)),
+    )
+
+
 def current_session(request: Request) -> dict[str, Any] | None:
     raw = request.cookies.get(COOKIE)
     if not raw:
@@ -33,14 +49,20 @@ def current_session(request: Request) -> dict[str, Any] | None:
         data = _serializer(request).loads(raw, max_age=MAX_AGE)
     except BadSignature:
         return None
-    return data if isinstance(data, dict) and data.get("csrf") else None
+    if (
+        not isinstance(data, dict)
+        or not data.get("csrf")
+        or data.get("epoch", 0) != _epoch(request)
+    ):
+        return None
+    return data
 
 
 def start_session(request: Request, response: Response) -> None:
     secure = state_of(request).base.startswith("https://")
     response.set_cookie(
         COOKIE,
-        _serializer(request).dumps({"csrf": secrets.token_urlsafe(24)}),
+        _serializer(request).dumps({"csrf": secrets.token_urlsafe(24), "epoch": _epoch(request)}),
         max_age=MAX_AGE,
         httponly=True,
         secure=secure,

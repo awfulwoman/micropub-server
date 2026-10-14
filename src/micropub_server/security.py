@@ -6,6 +6,8 @@ import json
 
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
+CSP = "default-src 'self'; img-src 'self' https: data:; frame-ancestors 'none'; base-uri 'self'"
+
 # Pages and endpoints that legitimately carry files.
 UPLOAD_PREFIXES = ("/micropub", "/media", "/files/upload", "/posts/")
 
@@ -40,7 +42,12 @@ class SecurityMiddleware:
                 extra = [
                     (b"x-content-type-options", b"nosniff"),
                     (b"referrer-policy", b"same-origin"),
+                    (b"x-frame-options", b"DENY"),
                 ]
+                kind = next((v for k, v in headers if k.lower() == b"content-type"), b"")
+                if b"html" in kind:
+                    # No form-action here: the consent page must be able to redirect to the app.
+                    extra.append((b"content-security-policy", CSP.encode()))
                 if hsts:
                     extra.append((b"strict-transport-security", b"max-age=31536000"))
                 headers.extend((k, v) for k, v in extra if k not in present)
