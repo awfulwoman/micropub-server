@@ -97,6 +97,10 @@ CREATE TABLE login_attempts (
 - Delete expired `auth_requests`, `auth_codes`, `cache` and
   `login_attempts` rows on startup and hourly.
 - Never store raw tokens or codes. Only hashes.
+- Snapshot consistency: ZFS snapshots of a live SQLite file in WAL mode
+  are crash-consistent, which SQLite recovers from. That is enough for
+  `low`. Also run `PRAGMA wal_checkpoint(TRUNCATE)` hourly, so the WAL file
+  stays small and snapshots stay close to the main file.
 - Backups: the infra ZFS dataset policy `low` is enough. The posts
   themselves live in Git. Losing the database loses tokens (clients sign in
   again), syndication state and undelete history.
@@ -116,7 +120,8 @@ micropub-server import [--source store|PATH] [--section notes] [--dry-run]
 2. Work out the post type from the section directory, not from the
    properties, so a `bandnames/` file is a bandname.
 3. Parse the front matter (ruamel.yaml), plus the body as `content.text`.
-4. Reverse the mapping in [06](06-post-templates.md) into JF2:
+4. Reverse the mapping from the site's `data/micropub.yaml`
+   ([06](06-post-templates.md#the-site-owns-the-shape)) into JF2:
    - `title` becomes `name`, `date` becomes `published`, `tags` becomes
      `category`.
    - `bookmark_of` becomes `bookmark-of`, and so on for the other link

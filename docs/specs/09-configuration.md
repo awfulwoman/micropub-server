@@ -168,6 +168,11 @@ syndication:
 
 Notes:
 
+- **`template.mapping`, `template.omit` and `post_types` are the fallback
+  copy.** At run time they come from the site repo's `data/micropub.yaml`
+  ([06](06-post-templates.md#the-site-owns-the-shape)). The config key
+  `site_config_path: data/micropub.yaml` (relative to the store) points at
+  it. Set it to `null` to use only the local copy.
 - `post_types` is a keyed map, as in Indiekit ADR 0005. Each key is the type
   name used by post type discovery.
 - `properties` and `required_properties` only feed `q=config` and

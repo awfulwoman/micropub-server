@@ -205,7 +205,21 @@ volumes:
 ## Infra
 
 Replace the `composition-indiekit` role with `composition-micropub-server` on
-`vps-hetzner-public01`:
+`vps-hetzner-public01`. Create it with the `awfulwoman-ansible-create-composition`
+skill, and follow its conventions:
+
+- Role `roles/composition-micropub-server/`. `composition_name: micropub-server`.
+- Variables `composition_micropub_server_*`, e.g.
+  `composition_micropub_server_image`.
+- Secrets in `inventory/group_vars/infra/vault_composition_micropub_server.yaml`,
+  named `vault_composition_micropub_server_<thing>`. **Copy the values** from
+  the indiekit vault vars, rather than pointing at them, so the Indiekit role
+  can be deleted cleanly.
+- `composition_dns_subdomains: []`, because the name is public and lives in
+  `infra-public-resources`.
+- Every loop sets `loop_control.loop_var`.
+
+Further details:
 
 - Hostname `indie.{{ domainname_personal }}` (`indie.awfulwoman.com`). The
   public CNAME already exists in `infra-public-resources`.
@@ -217,12 +231,35 @@ Replace the `composition-indiekit` role with `composition-micropub-server` on
   by uid 1000). **No MongoDB.** `read_only: true`, `tmpfs: /tmp`.
 - `config.yaml` rendered from a template into `composition_config`, mounted
   read-only.
-- Env vars: reuse the existing vault vars.
-  - `vault_composition_indiekit_secret` becomes `SECRET`.
-  - `vault_composition_indiekit_password_secret` becomes `PASSWORD_SECRET`
-    (bcrypt, accepted).
-  - `vault_composition_indiekit_github_token` becomes `GITHUB_TOKEN`.
+- Env vars from the new vault vars, whose values are copied from Indiekit's:
+  - `vault_composition_micropub_server_secret` (was `…indiekit_secret`)
+    becomes `SECRET`.
+  - `vault_composition_micropub_server_password_secret` (was
+    `…indiekit_password_secret`, bcrypt) becomes `PASSWORD_SECRET`.
+  - `vault_composition_micropub_server_github_token` (was
+    `…indiekit_github_token`) becomes `GITHUB_TOKEN`.
 - ZFS policy `low`, as now.
+
+### Deploys follow the pin, not the merge
+
+The nightly Semaphore run deploys infra's GitHub `main`. A merged server
+change is **not** live until the `sha-*` pin in
+`composition_micropub_server_image` is bumped in infra, and that change is
+pushed. Optionally add a Renovate rule (infra has `renovate.json`) to open
+pin-bump PRs when a new image is published.
+
+### Monitoring
+
+- **Gatus** (`composition-gatus`): add an endpoint for
+  `https://indie.awfulwoman.com/health`. Conditions: `[STATUS] == 200`,
+  `[BODY].store == ok`, `[BODY].db == ok`, `[RESPONSE_TIME] < 2000`. Check
+  every 5 minutes.
+- **Alerts go to Home Assistant**, not email, like all monitoring here.
+- **Logs:** public01 runs `logtide-agent`. Before fixing the JSON log field
+  names (`time`, `level`, `msg`, …), check what logtide parses, and match it
+  so logs need no extra parsing rules.
+- Metrics are optional, a later `/metrics` for VictoriaMetrics: posts
+  created, store errors, token checks.
 
 ## Cut-over from Indiekit
 

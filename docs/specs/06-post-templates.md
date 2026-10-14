@@ -29,11 +29,52 @@ The post's JF2 minus internal properties: no `mp-*`, `post-type`, `uid`, or
   needed, `allow_unicode`. Write dates as quoted strings, because Hugo parses
   them either way.
 
+## The site owns the shape
+
+Paths, URL patterns and front-matter keys belong to the **site**, not the
+server. They live in the site repo as **`data/micropub.yaml`** (the Hugo
+`data/` directory, so layouts can read it too). The server:
+
+- reads it through the store at startup, and again every `cache_ttl`, or
+  when `/syndicate` or the admin "reload" button is hit after a deploy.
+- falls back to the copy in its own `config.yaml` if the file is missing or
+  invalid. It logs the reason and reports `site_config: fallback` on
+  `/health`.
+- uses the same file in reverse for `import` ([10](10-data-model.md#import-command)).
+
+So when a layout change renames a key, the same commit in the site repo
+updates `data/micropub.yaml`, and the server follows. The server and the
+layouts cannot drift apart.
+
+Shape of the file (the post-type and mapping blocks from
+[09](09-configuration.md), nothing secret):
+
+```yaml
+# awfulwoman.com/data/micropub.yaml
+version: 1
+mapping:
+  name: title
+  published: date
+  category: tags
+  bookmark-of: bookmark_of
+  # …
+omit: [uid, slug, url, publishDate]
+post_types:
+  note:
+    name: Note
+    post:
+      path: content/notes/{yyyy}/{MM}/{dd}/{HH}{mm}.md
+      url: notes/{yyyy}/{MM}/{dd}/{HH}{mm}/
+  # …
+```
+
+The server's `config.yaml` keeps only what is about the server: the store,
+secrets, syndication, media limits.
+
 ## Field mapping
 
-The mapping is **configuration**, not code (see [09](09-configuration.md)),
-so the site can change it without a release. The default mapping matches
-awfulwoman.com today:
+The defaults below match awfulwoman.com today. They are the first contents of
+`data/micropub.yaml`:
 
 | JF2 property | Front matter key | Notes |
 | --- | --- | --- |

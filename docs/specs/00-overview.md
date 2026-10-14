@@ -73,6 +73,7 @@ Modules, one per spec:
 | `syndication` | 08 | Cross-posting |
 | `config` | 09 | Load and validate settings |
 | `web` | 13 | Browser UI: forms, posts list, share, files, tokens |
+| (integrations) | 14 | Site workflow, gateway tools, agents skill, Karakeep, OwnTracks |
 | `db` | 10 | SQLite access and migrations |
 
 ## Suggested stack
@@ -81,7 +82,7 @@ Use maintained PyPI packages rather than hand-rolled code.
 
 | Need | Package |
 | --- | --- |
-| HTTP framework | FastAPI (or Starlette) + Uvicorn |
+| HTTP framework | Starlette + Uvicorn. Matches apple-calendar-server, mail-archive-server and gateway. |
 | HTML forms for sign-in and consent | Jinja2, plain HTML and CSS |
 | Outbound HTTP | httpx |
 | Microformats parsing (client info, `redirect_uri` discovery) | mf2py |
@@ -97,7 +98,9 @@ Use maintained PyPI packages rather than hand-rolled code.
 | Bluesky | atproto |
 | Database | sqlite3 from the standard library, or SQLAlchemy Core |
 | Settings | pydantic-settings |
-| Tests | pytest, respx (mock httpx) |
+| Python | `requires-python = ">=3.12"`, as the sibling repos. The image uses 3.13. |
+| Tests | pytest + pytest-asyncio, as the sibling repos. respx to mock httpx. |
+| Lint | ruff |
 
 ## Build phases
 

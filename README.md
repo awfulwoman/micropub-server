@@ -34,3 +34,4 @@ Start with [`docs/specs/00-overview.md`](docs/specs/00-overview.md).
 | [11 Deployment](docs/specs/11-deployment.md) | Container image, GHCR publishing, local dev, infra, cut-over |
 | [12 Indiekit divergences](docs/specs/12-indiekit-divergences.md) | Indiekit bugs and choices we do not copy |
 | [13 Web UI](docs/specs/13-web-ui.md) | Writing and managing posts in the browser, share bookmarklet |
+| [14 Integrations](docs/specs/14-integrations.md) | Site repo, gateway tools, create-draft skill, Karakeep, OwnTracks, infra |
