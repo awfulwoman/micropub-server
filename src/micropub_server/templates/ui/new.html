@@ -1,0 +1,9 @@
+{% extends "ui/layout.html" %}
+{% block title %}New post{% endblock %}
+{% block content %}
+<h1>New post</h1>
+<ul class="types">
+  {% for key, name in types %}<li><a href="/posts/new/{{ key }}">{{ name }}</a></li>{% endfor %}
+</ul>
+<p class="muted">Bookmark a page you are reading: drag <a href="{{ bookmarklet }}">Bookmark</a> to your bookmarks bar.</p>
+{% endblock %}

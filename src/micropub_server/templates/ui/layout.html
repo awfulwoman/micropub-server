@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block header %}
+<a class="skip" href="#main">Skip to content</a>
+<nav class="site-nav" aria-label="Main">
+  <div class="bar">
+    <a class="brand" href="/posts">{{ app_name }}</a>
+    <a href="/posts">Posts</a>
+    <a href="/posts/new">New post</a>
+    <a href="/files">Files</a>
+    <a href="/tokens">Apps</a>
+    <a href="/status">Status</a>
+    <form method="post" action="/logout">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <button class="link-button" type="submit">Sign out</button>
+    </form>
+  </div>
+</nav>
+{% endblock %}

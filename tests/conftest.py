@@ -32,7 +32,7 @@ CONFIG = {
                 "path": "content/notes/{yyyy}/{MM}/{dd}/{HH}{mm}.md",
                 "url": "notes/{yyyy}/{MM}/{dd}/{HH}{mm}/",
             },
-            "properties": ["content", "category"],
+            "properties": ["content", "category", "location"],
             "required_properties": ["content"],
         },
         "article": {

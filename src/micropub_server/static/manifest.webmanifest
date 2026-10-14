@@ -1,0 +1,1 @@
+{"name":"Micropub server","short_name":"Micropub","start_url":"/posts","display":"standalone","background_color":"#17171a","theme_color":"#17171a","share_target":{"action":"/share","method":"GET","params":{"url":"url","title":"title","text":"text"}}}

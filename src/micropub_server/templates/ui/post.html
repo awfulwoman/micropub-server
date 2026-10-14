@@ -1,0 +1,29 @@
+{% extends "ui/layout.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<h1>{{ title }}</h1>
+{% if notice %}<p class="notice" role="status">{{ notice }}</p>{% endif %}
+<p class="meta">
+  {{ type_label }} &middot; <time datetime="{{ row.published }}">{{ row.published }}</time>
+  {% if deleted %}<span class="badge deleted">deleted</span>{% endif %}
+  {% if row.post_status == 'draft' %}<span class="badge draft">draft</span>{% endif %}
+</p>
+{% if not deleted %}<p><a href="{{ row.url }}">{{ row.url }}</a></p>{% endif %}
+
+{% if preview_html %}<div class="preview">{{ preview_html | safe }}</div>{% endif %}
+{% if photos %}
+<ul class="gallery">
+  {% for p in photos %}<li><img src="{{ p.src }}" alt="{{ p.alt }}" loading="lazy"></li>{% endfor %}
+</ul>
+{% endif %}
+
+<h2>Details</h2>
+<dl class="props">
+  {% for key, value in details %}<dt>{{ key }}</dt><dd>{{ value }}</dd>{% endfor %}
+</dl>
+{% if copies %}<h2>Also published at</h2><ul>{% for c in copies %}<li><a href="{{ c }}">{{ c }}</a></li>{% endfor %}</ul>{% endif %}
+
+<h2>File</h2>
+<p class="muted"><code>{{ row.path }}</code></p>
+{% if file_text %}<pre>{{ file_text }}</pre>{% endif %}
+{% endblock %}

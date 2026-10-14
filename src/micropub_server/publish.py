@@ -186,6 +186,7 @@ async def create_post(
     *,
     draft: bool,
     uploads: dict[str, list[Processed]] | None = None,
+    expect_type: str | None = None,
 ) -> Created:
     jf2.pop("uid", None)  # never trust a client-chosen uid or slug
     jf2.pop("slug", None)
@@ -215,6 +216,12 @@ async def create_post(
     if cfg is None:
         raise MicropubError(
             "not_implemented", f"No post type is configured for {post_type} posts", 501
+        )
+    if expect_type and post_type != expect_type:
+        raise MicropubError(
+            "invalid_request",
+            f"This would be saved as a {post_type} post, not a {expect_type}. Check the fields.",
+            422,
         )
     if props.get("bookmark-of"):
         props["basedomain"] = base_domain(

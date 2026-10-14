@@ -4,21 +4,15 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}{{ app_name }}{% endblock %}</title>
-  <style>
-    :root { color-scheme: light dark; font-family: system-ui, sans-serif; line-height: 1.5; }
-    body { max-width: 34rem; margin: 2rem auto; padding: 0 1rem; }
-    label { display: block; margin: 1rem 0 .25rem; }
-    input[type=password], input[type=text] { width: 100%; padding: .5rem; box-sizing: border-box; }
-    button { padding: .5rem 1rem; margin-right: .5rem; }
-    .error { color: #b00020; }
-    .client img { height: 3rem; vertical-align: middle; margin-right: .5rem; }
-    code, pre { background: rgba(127,127,127,.15); padding: .1rem .3rem; }
-    pre { padding: .75rem; overflow-x: auto; }
-  </style>
+  <link rel="stylesheet" href="/static/app.css">
+  <link rel="manifest" href="/static/manifest.webmanifest">
+  {% block head %}{% endblock %}
 </head>
 <body>
-  <main>
+  {% block header %}{% endblock %}
+  <main id="main">
     {% block content %}{% endblock %}
   </main>
+  {% block scripts %}{% endblock %}
 </body>
 </html>

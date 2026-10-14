@@ -1,0 +1,44 @@
+{% extends "ui/layout.html" %}
+{% block title %}Posts{% endblock %}
+{% block content %}
+<h1>Posts</h1>
+{% if notice %}<p class="notice" role="status">{{ notice }}</p>{% endif %}
+<p><a class="button primary" href="/posts/new">New post</a></p>
+<form class="filters" method="get" action="/posts">
+  <div><label for="q">Search</label><input id="q" type="search" name="q" value="{{ filters.q or '' }}"></div>
+  <div><label for="type">Type</label>
+    <select id="type" name="type"><option value="">All</option>
+      {% for key, label in types %}<option value="{{ key }}" {{ 'selected' if filters.type == key }}>{{ label }}</option>{% endfor %}
+    </select></div>
+  <div><label for="status">Status</label>
+    <select id="status" name="status">
+      {% for key, label in statuses %}<option value="{{ key }}" {{ 'selected' if filters.status == key }}>{{ label }}</option>{% endfor %}
+    </select></div>
+  <div><label for="tag">Tag</label><input id="tag" type="text" name="tag" value="{{ filters.tag or '' }}"></div>
+  <div><button type="submit">Filter</button></div>
+</form>
+{% if rows %}
+<ul class="posts">
+  {% for p in rows %}
+  <li>
+    <a href="/posts/{{ p.uid }}">{{ p.title }}</a>
+    <div class="meta">
+      <span>{{ p.type_label }}</span>
+      <time datetime="{{ p.published }}">{{ p.published[:10] }}</time>
+      {% if p.deleted %}<span class="badge deleted">deleted</span>{% endif %}
+      {% if p.status == 'draft' %}<span class="badge draft">draft</span>{% endif %}
+      {% if p.waiting %}<span class="badge">waiting to share</span>{% endif %}
+      {% if p.imported %}<span class="badge">imported</span>{% endif %}
+      {% if not p.deleted %}<a href="{{ p.url }}">live</a>{% endif %}
+    </div>
+  </li>
+  {% endfor %}
+</ul>
+<div class="pager">
+  {% if prev_url %}<a href="{{ prev_url }}">&larr; Newer</a>{% else %}<span></span>{% endif %}
+  {% if next_url %}<a href="{{ next_url }}">Older &rarr;</a>{% endif %}
+</div>
+{% else %}
+<p class="muted">No posts match.</p>
+{% endif %}
+{% endblock %}
