@@ -36,6 +36,7 @@ micropub-server = "micropub_server.cli:main"
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+filterwarnings = ["ignore::DeprecationWarning:starlette.testclient"]
 
 [tool.ruff]
 line-length = 100
@@ -44,6 +45,7 @@ extend-exclude = ["docs"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP"]
+ignore = ["E501"]  # the formatter owns line length; long string literals are fine
 
 [build-system]
 requires = ["hatchling"]

@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Using this IndieAuth endpoint</h1>
+<p>Add these to the <code>&lt;head&gt;</code> of {{ me }}:</p>
+<pre>&lt;link rel="authorization_endpoint" href="{{ base }}auth"&gt;
+&lt;link rel="token_endpoint" href="{{ base }}auth/token"&gt;
+&lt;link rel="indieauth-metadata" href="{{ base }}.well-known/oauth-authorization-server"&gt;
+&lt;link rel="micropub" href="{{ base }}micropub"&gt;</pre>
+{% endblock %}
