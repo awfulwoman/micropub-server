@@ -10,7 +10,7 @@ says what changes **outside** this repo, and in which phase.
 | Add `data/micropub.yaml`: post types, paths, front-matter mapping | The site owns its content shape ([06](06-post-templates.md#the-site-owns-the-shape)) | 1 |
 | Add `rel="indieauth-metadata"` to `baseof.html` | Newer IndieAuth clients use it ([02](02-indieauth.md#discovery-on-the-site)) | 1 |
 | Generate a tags list, e.g. a JSON output at `/tags/index.json` | Category suggestions for `q=category` and the web UI | 2 |
-| Layouts for `in_reply_to`, `repost_of`, `quote_of` and `place_*` | These are written today but not shown | 2 |
+| Layouts for `in_reply_to`, `repost_of`, `quote_of` and `place_*` | These are written today but not shown (awfulwoman/awfulwoman.com#1) | 2 |
 | Check `opengraph.html` with `images: [{file, alt}]` | It expects a list of URL strings | 2 |
 | Final step in `.github/workflows/build.yaml`: `POST /syndicate` with `SYNDICATE_TOKEN` | Cross-post after the post is live ([08](08-syndication.md)) | 4 |
 | CI step: fail the build if any image under `content/` has GPS EXIF | API commits skip the `exif.sh` pre-commit hook. The server strips EXIF, and this catches anything else. | 2 |
@@ -38,7 +38,7 @@ of writing files:
 `awfulwoman-list-drafts` can use `q=source` with a draft filter in the same
 way.
 
-Until then, track the broken path as its own issue.
+Until then, the broken path is tracked in awfulwoman/agents#1.
 
 ## gateway: MCP tools
 
