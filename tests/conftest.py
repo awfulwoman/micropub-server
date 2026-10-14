@@ -1,5 +1,6 @@
 import base64
 import hashlib
+from datetime import UTC, datetime
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
@@ -79,6 +80,7 @@ def state(tmp_path, site):
     )
     db = Database(tmp_path / "data" / "micropub.db")
     return AppState(
+        clock=lambda: datetime(2026, 10, 14, 17, 10, 47, tzinfo=UTC),
         config=config,
         settings=settings,
         db=db,
