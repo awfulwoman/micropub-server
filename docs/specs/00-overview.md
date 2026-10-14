@@ -68,6 +68,7 @@ Modules, one per spec:
 | `stores` | 07 | Write files to GitHub or disk |
 | `syndication` | 08 | Cross-posting |
 | `config` | 09 | Load and validate settings |
+| `web` | 13 | Browser UI: forms, posts list, share, files, tokens |
 | `db` | 10 | SQLite access and migrations |
 
 ## Suggested stack
@@ -108,8 +109,9 @@ Each phase ends deployable.
 3. **Editing and import.** Update (replace, add, delete), delete, undelete.
    Draft scope. `import` command for existing posts.
 4. **Syndication.** Mastodon, then Bluesky. `/syndicate` endpoint.
-5. **Small admin UI.** List recent posts, show the source, re-run
-   syndication. Optional.
+5. **Web UI** ([13](13-web-ui.md)). Write, edit and delete posts in the
+   browser. Share bookmarklet and Web Share Target. Files and tokens pages.
+   Split into 5a to 5c.
 
 ## Decisions (2026-10-14)
 

@@ -247,8 +247,8 @@ object.
 ## Signing in to the server's own UI
 
 Indiekit signs its own UI in through its own IndieAuth flow, acting as its
-own client. For a single-user admin UI, a simpler password session cookie is
-enough:
+own client. For a single-user UI, a simpler password session cookie is
+enough. Details are in [13](13-web-ui.md#sign-in):
 
 - `itsdangerous`-signed, `HttpOnly`, `Secure`, `SameSite=Lax`.
 - 30-day expiry.

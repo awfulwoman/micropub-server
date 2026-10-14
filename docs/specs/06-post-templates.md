@@ -93,7 +93,7 @@ rule in [03](03-micropub.md#create).
 | --- | --- | --- |
 | quote | `quotation-of=<url>` plus `content` (the quoted text). Optional `author` h-card. | `discovery: quotation-of` |
 | checkin | `checkin` = h-card (`name`, `latitude`, `longitude`, `url`), as OwnYourSwarm sends | `discovery: checkin`, `discovery_first: true` |
-| bandname | `name` only, with `mp-channel=bandnames`. The admin UI offers a "Band name" form. | channel binding (step 0 in [05](05-post-model.md#post-type-discovery)) |
+| bandname | `name` only, with `mp-channel=bandnames`. The web UI's band name form sets this ([13](13-web-ui.md)). | channel binding (step 0 in [05](05-post-model.md#post-type-discovery)) |
 
 A bandname file has front matter only, with no body, matching
 `content/bandnames/2024/11/wifebiscuits.md`:

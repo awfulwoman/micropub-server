@@ -44,6 +44,7 @@ bugs upstream.
 | EXIF is stripped as a side effect of sharp re-encoding | Explicit strip, with a test fixture | Privacy: the `exif.sh` hook never runs for API commits |
 | Plugin system (npm packages, `init()` hooks) | Plain modules | One site, one user |
 | Localised UI in many languages | English only | Not needed |
+| UI forms post through separate controllers, then call Micropub over HTTP | UI forms call the Micropub functions in-process | One code path, no self-HTTP |
 | Its own UI signs in through its own IndieAuth flow | Password session cookie | Simpler for one user |
 | Request host decides the application URL | `BASE_URL` env var | Predictable behind a proxy |
 

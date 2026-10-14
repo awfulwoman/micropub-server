@@ -33,3 +33,4 @@ Start with [`docs/specs/00-overview.md`](docs/specs/00-overview.md).
 | [10 Data model](docs/specs/10-data-model.md) | SQLite schema |
 | [11 Deployment](docs/specs/11-deployment.md) | Container, health, infra composition, cut-over |
 | [12 Indiekit divergences](docs/specs/12-indiekit-divergences.md) | Indiekit bugs and choices we do not copy |
+| [13 Web UI](docs/specs/13-web-ui.md) | Writing and managing posts in the browser, share bookmarklet |
