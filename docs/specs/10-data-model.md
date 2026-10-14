@@ -25,7 +25,7 @@ CREATE TABLE posts (
   deleted            TEXT,                       -- set when deleted
   properties         TEXT NOT NULL,              -- JF2 JSON (includes mp-* commands)
   deleted_properties TEXT,                       -- JF2 JSON kept for undelete
-  source             TEXT NOT NULL DEFAULT 'micropub',  -- micropub|import
+  source             TEXT NOT NULL DEFAULT 'micropub',  -- micropub|import (import rows are updated by re-importing, never overwrite micropub rows)
   created_at         TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX posts_published ON posts (published DESC, uid DESC);
@@ -107,46 +107,63 @@ CREATE TABLE login_attempts (
 
 ## Import command
 
-Decided on 2026-10-14: build it. `micropub-server import` lets `q=source`,
-updates and syndication work on posts this server did not create.
+Built and checked against the real awfulwoman.com content (2,919 dated posts).
 
 ```
-micropub-server import [--source store|PATH] [--section notes] [--dry-run]
+micropub-server import [--source PATH] [--dry-run] [--type NAME] [--check-urls]
 ```
 
-1. Walk the content directories of every configured post type. Read from the
-   store (GitHub tree API, one recursive call) or from a local checkout
-   (`PATH`, faster).
-2. Work out the post type from the section directory, not from the
-   properties, so a `bandnames/` file is a bandname.
-3. Parse the front matter (ruamel.yaml), plus the body as `content.text`.
-4. Reverse the mapping from the site's `data/micropub.yaml`
-   ([06](06-post-templates.md#the-site-owns-the-shape)) into JF2:
-   - `title` becomes `name`, `date` becomes `published`, `tags` becomes
-     `category`.
-   - `bookmark_of` becomes `bookmark-of`, and so on for the other link
-     types.
-   - `place_*` becomes a `checkin` h-card.
-   - `images` becomes `photo`.
-   - `draft: true` becomes `post-status: draft`.
-   - Unknown keys keep their name, with `_` changed to `-`.
-5. `url`: from the path the way Hugo builds it (`content/` stripped,
-   `index.md` and `.md` removed, trailing slash), or from `hugo.yaml`
-   permalinks (`posts` → `/posts/:slug/`). Better: read the URL list from
-   the built site's sitemap and match by path.
-6. `slug`: from the file or bundle name.
-7. `uid`: a UUIDv7 derived from `published`, so re-running the import is
-   stable.
-8. Upsert by `url`. Never overwrite a row the server created itself (one with
-   `created_at` after the import, or a `source: micropub` marker). Add a
-   `source` column: `micropub` or `import`.
-9. Report counts per section: imported, skipped, failed, with reasons.
-   Skip files that do not parse, without stopping.
+- `--source PATH` reads a local checkout of the site repo (fast, and lets it hash photo
+  attachments). Without it, files are listed and read through the store (the GitHub tree API,
+  then one contents call per file).
+- `--dry-run` reports and changes nothing. `--type bookmark` limits it to one post type.
+- `--check-urls` then asks the **live site** for every imported, published URL and prints the
+  ones that are not served.
 
-Old date formats vary (`2024-11-22`, `2019-10-05T08:25:54+00:00`,
-`2021-01-22T06:52:41.736Z`). Parse all of them, and keep `published` as it
-was written so rewrites do not change it.
+How a file becomes a post:
 
-Updating an imported post rewrites its file with our template. Its front
-matter may change shape (key order, quoting). That is expected. The first
-update of an old post makes a bigger diff than later ones.
+1. **Type** comes from the section, using the static prefix of each post type's `post.path`
+   (`content/notes/{yyyy}/...` gives `content/notes/`). The longest prefix wins. Markdown files
+   outside every prefix (`about.md`, `guineapigs/`) are skipped and counted.
+2. **Front matter** is parsed as YAML. A file with no `date`, or with invalid front matter, is a
+   reported failure, and nothing else is affected.
+3. **Reverse mapping** (inverse of [06](06-post-templates.md)): `title` is `name`, `date` is
+   `published`, `lastmod` or `modified` is `updated`, `tags` is `category`, `description` is
+   `summary`, the link keys (`bookmark_of`, `like_of`, `repost_of`, `in_reply_to`, `quote_of`)
+   map back to their hyphenated names, `images` is `photo`, `draft: true` is
+   `post-status: draft`, and `place_geo` is a `checkin` card for checkins or a `location` for
+   everything else.
+4. **Everything else is kept verbatim** in a `front-matter` property and written back exactly
+   as found: `slug`, `strapline`, `aliases`, `menus`, `params`, `add_like`,
+   `*_oembed_twitter` blobs, an existing `basedomain`, and any extra keys on photo entries such
+   as `width` and `height`. Hugo layouts and permalinks depend on these, so a rewrite must never
+   drop them.
+5. **Dates** come in at least five shapes in the wild (`...Z`, `+0100` without a colon, a date
+   only, YAML datetimes, a date object). All are parsed and stored in the site's time zone.
+6. **URL**: if the file path matches the post type's `post.path` template, the URL comes from
+   its `post.url` template with the captured tokens. Otherwise it is Hugo's default (the path
+   without `content/`, `index.md` or `.md`, plus a trailing slash). The `{slug}` token is the
+   front matter `slug` if there is one, else it depends on the type's **`import_slug`**:
+   `path` (the file or folder name, the default) or `title` (the slugified title). Hugo's
+   `/posts/:slug/` permalink falls back to the title, so articles need `import_slug: title`,
+   while band names are served by filename. Getting this wrong gave seven wrong article URLs
+   until `--check-urls` caught it.
+7. **uid** is a UUIDv5 of the URL, so re-running is stable (this replaces the earlier idea of a
+   UUIDv7 derived from the date).
+8. **Bundle attachments** (photos, video and audio next to an `index.md`) get `media` rows
+   linked to the post, so moving or syndicating the post finds them.
+9. **Line endings** in post bodies are normalised to LF.
+10. **Re-running** updates rows it created earlier and reports them `unchanged` when nothing
+    differs. It never overwrites a row with `source = 'micropub'`; that is reported as a
+    conflict.
+
+### What a rewrite changes
+
+Rendering all 2,918 imported posts back from the database and comparing them with the original
+files differs only by: `modified` becoming `lastmod` (629 posts; Hugo's real key), trailing
+whitespace trimmed from some titles and photo alt texts, and empty `tags:` dropped. Bodies match
+exactly. The first edit of an old post therefore makes a small diff, and later edits are exact.
+
+An edit never changes an imported post's type or URL by itself. A post's type only changes if
+the edit changes what discovery says about it, so a note with a title (which discovery calls an
+article) stays a note.

@@ -64,9 +64,11 @@ If not, skip it and leave `mp-syndicate-to` for the next trigger.
 
 ## Mastodon
 
-Settings: `url` (instance), `user`, `access_token` (env
-`MASTODON_ACCESS_TOKEN`), `character_limit` (default 500), `checked`,
-`include_permalink` (default true). Library: Mastodon.py.
+Settings: `url` (instance), `user`, `checked`, `character_limit` (default 500),
+`include_permalink` (default true), `visibility`. The token is the `MASTODON_ACCESS_TOKEN`
+environment variable. **Built on httpx directly**, not Mastodon.py: it is synchronous and
+built on `requests`, and the three calls needed (status, favourite/reblog, media) are small.
+Every status carries the post's `uid` as an `Idempotency-Key`, so a retry never double-posts.
 
 | Post | Action on Mastodon |
 | --- | --- |
@@ -106,3 +108,15 @@ The returned URL is `https://bsky.app/profile/{handle}/post/{rkey}`.
 A failed target never fails the request. Log it, keep it in
 `mp-syndicate-to`, and include it in the response:
 `{"failed": ["https://bsky.app/"]}`.
+
+A post that **cannot be mirrored** on a target (a like or reply aimed at another site) is
+dropped from the queue without a copy, rather than failing forever.
+
+## As built
+
+- `POST /syndicate` needs a bearer token with the `update` scope (the optional signed webhook
+  is not built). `?source_url=` (or `{"syndication": {"source_url": ...}}`) names a post.
+- `syndication.require_live` (default true) fetches the post's public URL first and leaves the
+  post queued if it is not served yet.
+- The copy is recorded through the same path as an update, so it is one commit.
+- Bluesky is not built yet.

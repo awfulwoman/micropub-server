@@ -93,7 +93,7 @@ problem.
 
 ### Update
 
-Body (JSON or form-encoded), following the Micropub spec:
+JSON only (form-encoded updates are rejected with 400). Body, following the Micropub spec:
 
 ```json
 {
@@ -105,51 +105,51 @@ Body (JSON or form-encoded), following the Micropub spec:
 }
 ```
 
-- `delete` can be a list of property names, which removes the whole
-  properties, or an object of `{property: [values]}`, which removes those
-  values only.
-- Every value in `replace`, `add` and `delete` objects must be a list.
-  Otherwise `400 invalid_request`.
-- At least one of `replace`, `add` or `delete` is required. **Indiekit checks
-  for `remove` instead of `delete` here, so a delete-only update is rejected.
-  Do not copy this.**
-- Apply the operations in the order add, replace, delete. Apply **every** key
-  in `add`. Indiekit's `addProperties` returns after the first key.
-- `replace` with a one-item list holding an mf2 object converts it to JF2.
-  An empty list is ignored.
-- Keep `uid` whatever the client sends.
-- Normalise again, then re-run post type discovery. The type, and so the path
-  and URL, can change.
-- Compare the template properties (everything except `mp-*` and `post-type`)
-  before and after. If they are equal: `200` with
-  `{"success": "update", "success_description": "Post at {url} not updated as no properties changed"}`.
-  Nothing is written.
-- Otherwise set `updated` to now and write to the store:
-  - Same path: update the file in place. The message is
-    `update {post-type} post`.
-  - Path changed: move the file (delete the old one, create the new one).
-    Respond `201` with the new `Location`.
-  - Same path: respond `200`. With JSON, the body is
-    `{"success": "update", …}` or `204` with no body. Both are allowed by
-    the spec. Use `200` with a body, as Indiekit does.
-
-Unknown URL: `400` with `{"error": "invalid_request", "error_description": "No post found at {url}"}`.
+- `delete` can be a list of property names, which removes the whole properties, or an object of
+  `{property: [values]}`, which removes those values only.
+- Every value in `replace`, `add` and a `delete` object must be a list, otherwise 400.
+- At least one of `add`, `replace` and `delete` is required. (Indiekit checks for `remove`, so
+  a delete-only update is rejected, and its `add` stops after the first key. Both are bugs
+  here.)
+- Operations apply in the order add, replace, delete, and **every** key is applied.
+- `uid`, `url`, `post-type` and `type` cannot be changed by a client.
+- **A slug is fixed once chosen.** Editing a title does not move the post. Only `mp-slug` in
+  an update changes the slug, and that moves the post.
+- **A type is fixed unless the edit changes what discovery says.** Adding a photo to a note
+  makes it a photo post and moves it. Editing the text of a titled note imported from the site
+  does not turn it into an article.
+- The `channel` is kept unless `mp-channel` is given.
+- `post-status` can be replaced (`draft` to `published` publishes a draft).
+- The post is rendered again. If the file would be identical and nothing about its place
+  changed, the response is `200` with
+  `"Post at {url} not updated as no properties changed"` and nothing is committed. If only
+  server-side commands changed (`mp-syndicate-to`), they are saved without a commit.
+- Otherwise `updated` is set and the file is committed. If the **slug, publication time or
+  type** changed, the post moves (path and URL are rendered again, with `-2`, `-3` ... if
+  taken). A page bundle moves together with its photos, in the same commit. A move returns
+  `201` with the new `Location`; an in-place edit returns `200`.
+- With the `draft` scope only posts that are drafts can be edited, and they stay drafts.
+  Anything else is `403 insufficient_scope`.
+- Unknown URL: `400 invalid_request`. A deleted post cannot be updated.
+- A store failure is `502 store_error` and the database is left as it was.
 
 ### Delete
 
-1. Load the post record. Not found: `400 invalid_request`.
-2. Keep the full properties in `deleted_properties`. Reduce the live
-   properties to the ones needed to rebuild the path: `post-type`,
-   `published`, `slug`, `type`, `uid`, `url`. Then set `deleted` to now.
-3. Delete the file from the store. The message is `delete {post-type} post`.
-4. `200` with `{"success": "delete", "success_description": "Post deleted from {url}"}`.
+1. Load the post record. Not found: `400 invalid_request`. Already deleted: `200`, nothing to
+   do.
+2. Delete the post's file in one commit (`delete {post-type} post`). **Photos in its bundle are
+   kept**, so an undelete can bring the post back whole.
+3. Keep the full properties in `deleted_properties`. Reduce the live properties to the ones needed
+   to rebuild the path (`post-type`, `published`, `slug`, `type`, `uid`, `url`), plus `deleted`.
+4. `200` with `{"success": "delete", "success_description": "Post deleted from {url}"}`. Deleted
+   posts are hidden from `q=source`.
 
 ### Undelete
 
-1. Load the record. It must have `deleted_properties`. Otherwise `400`.
-2. Restore them. Set `post-status` (draft in draft mode).
-3. Create the file again. The message is `undelete {post-type} post`.
-4. `200` with `Location: {url}`.
+1. The post must be deleted, else `400`.
+2. Restore the properties (`post-status: draft` in draft mode), render the file again and commit
+   it at its original path (`undelete {post-type} post`).
+3. `200` with `Location: {url}` and `{"success": "delete_undelete", ...}`.
 
 ## GET: queries
 

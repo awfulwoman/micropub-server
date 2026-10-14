@@ -102,6 +102,9 @@ In order of preference:
 3. The first 5 characters of `md5(published)`. This gives the random-looking
    `1fe47` seen on the test note.
 
+A client-sent `slug` property is ignored, and an existing slug is kept unless `mp-slug` is given
+(see update in [03](03-micropub.md#update)).
+
 Then slugify: lower-case, ASCII-fold (`python-slugify`), and join with the
 configured separator (default `-`). An empty result falls back to option 3.
 

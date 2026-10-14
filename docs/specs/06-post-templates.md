@@ -98,7 +98,10 @@ The defaults below match awfulwoman.com today. They are the first contents of
 | `syndication` | `syndication` | list of URLs |
 | `visibility` | `visibility` | |
 | `content.text` | body | not in the front matter |
+| `front-matter` (a dict, set by the importer) | its keys, verbatim | slug, strapline, aliases, oEmbed blobs ... never dropped |
 | anything else | the same key with `-` replaced by `_` | so nothing is silently lost |
+| photo entry extras (`width`, `height`) | kept next to `file` and `alt` | |
+| `basedomain` | passed through | **derived once, when a bookmark is created or its link changes**, never while rendering, so old bookmarks do not gain it on an unrelated edit |
 
 Key order: `title`, `date`, `lastmod`, `draft`, the type-specific keys
 (`bookmark_of`, `basedomain`, `like_of`, …), `tags`, `images`,
