@@ -9,6 +9,12 @@ from pathlib import Path
 from .base import Change, Delete, Move, Put, StoreError
 
 
+def _umask() -> int:
+    current = os.umask(0)
+    os.umask(current)
+    return current
+
+
 class FileSystemStore:
     name = "File system"
 
@@ -53,6 +59,8 @@ class FileSystemStore:
         try:
             with os.fdopen(fd, "wb") as handle:
                 handle.write(content)
+            # mkstemp makes the file 0600; give it the mode a normal write would get
+            os.chmod(tmp, 0o666 & ~_umask())
             os.replace(tmp, target)
         except BaseException:
             Path(tmp).unlink(missing_ok=True)

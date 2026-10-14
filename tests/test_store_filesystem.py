@@ -35,3 +35,11 @@ async def test_path_escape_rejected(tmp_path):
 async def test_check(tmp_path):
     assert await FileSystemStore(tmp_path).check() is None
     assert "does not exist" in await FileSystemStore(tmp_path / "nope").check()
+
+
+async def test_written_files_are_world_readable(tmp_path):
+    # mkstemp creates 0600 files; a site served from this directory must be able to read them
+    s = FileSystemStore(tmp_path)
+    await s.commit([Put("a/b.md", b"x")], "m")
+    mode = (tmp_path / "a" / "b.md").stat().st_mode & 0o777
+    assert mode & 0o044 == 0o044
