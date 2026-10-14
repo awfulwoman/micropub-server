@@ -129,8 +129,16 @@ class MastodonConfig(_Model):
     visibility: Literal["public", "unlisted", "private"] = "public"
 
 
+class BlueskyConfig(_Model):
+    handle: str
+    service: str = "https://bsky.social"
+    checked: bool = False
+    include_permalink: bool = True
+
+
 class Syndication(_Model):
     mastodon: MastodonConfig | None = None
+    bluesky: BlueskyConfig | None = None
     # Only syndicate once the post is live on the site (it is fetched first).
     require_live: bool = True
 

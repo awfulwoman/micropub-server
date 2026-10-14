@@ -23,6 +23,7 @@ dependencies = [
     "pillow>=12.3.0",
     "filetype>=1.2.0",
     "nh3>=0.3.7",
+    "atproto>=0.0.72",
 ]
 
 [dependency-groups]

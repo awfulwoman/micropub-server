@@ -56,16 +56,17 @@ def plain_text(content: Any) -> str:
     return re.sub(r"\n{3,}", "\n\n", text).strip()
 
 
-def counted_length(text: str) -> int:
-    return len(_URL.sub("x" * URL_LENGTH, text))
+def counted_length(text: str, url_length: int | None = URL_LENGTH) -> int:
+    """Length as the network counts it. Mastodon counts every URL as 23; Bluesky counts them in full."""
+    return len(_URL.sub("x" * url_length, text)) if url_length is not None else len(text)
 
 
-def truncate(text: str, room: int) -> str:
+def truncate(text: str, room: int, url_length: int | None = URL_LENGTH) -> str:
     """Cut at a word boundary so the text, plus an ellipsis, fits in room characters."""
-    if counted_length(text) <= room:
+    if counted_length(text, url_length) <= room:
         return text
     words = text.split(" ")
-    while words and counted_length(" ".join(words)) + 1 > room:
+    while words and counted_length(" ".join(words), url_length) + 1 > room:
         words.pop()
     return (" ".join(words).rstrip(" ,.;:-\n") + "…") if words else "…"
 
