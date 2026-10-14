@@ -103,6 +103,16 @@ Settings: `handle`, `password` (app password, env `BLUESKY_PASSWORD`),
 
 The returned URL is `https://bsky.app/profile/{handle}/post/{rkey}`.
 
+### As built
+
+- A link in the text becomes a link facet and each hashtag a tag facet. The limit is 300
+  characters with URLs counted in full (Bluesky does not shorten them).
+- Photos are re-encoded to fit Bluesky's roughly 1 MB blob limit, stepping the size and quality
+  down until they do.
+- Articles (a post with a title) get an external link card with the title and summary.
+- Anything aimed at a post outside Bluesky is dropped from the queue (`NotApplicable`).
+- Tested by mocking the XRPC endpoints with `respx`, using a crafted session token.
+
 ## Failures
 
 A failed target never fails the request. Log it, keep it in
@@ -119,4 +129,5 @@ dropped from the queue without a copy, rather than failing forever.
 - `syndication.require_live` (default true) fetches the post's public URL first and leaves the
   post queued if it is not served yet.
 - The copy is recorded through the same path as an update, so it is one commit.
-- Bluesky is not built yet.
+- Bluesky is built on the `atproto` library (see below), disabled unless `syndication.bluesky` is
+  configured, and unticked by default in clients (`checked: false`).

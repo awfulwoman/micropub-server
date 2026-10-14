@@ -12,11 +12,26 @@ Indiekit is the reference for behaviour, not for code.
 
 ## Status
 
-Phase 1 is built: IndieAuth, creating posts from form-encoded and JSON
-requests, the Micropub queries, the GitHub and file-system stores, the Hugo
-template, and the container. Not built yet: media uploads, update, delete and
-undelete, syndication, the import command and the web UI. See
-[`docs/specs/00-overview.md`](docs/specs/00-overview.md) for the phases.
+Built and tested:
+
+- **IndieAuth**: single-use codes, PKCE, hashed revocable tokens, consent page, profile from your
+  h-card, introspection, revocation, metadata.
+- **Micropub**: create (form and JSON), update, delete, undelete, all the queries, media uploads
+  with photo cleaning (orientation applied, all metadata including GPS stripped) and photos kept
+  in page bundles. Notes, articles, bookmarks, likes, replies, reposts, quotes, photos, checkins
+  and band names.
+- **Publishing**: one Git commit per action to GitHub (or a directory), in the shape your Hugo
+  site already uses. The site can own its own post types in `data/micropub.yaml`.
+- **Importing** the posts already on the site so they can be queried and edited.
+- **Syndication** to Mastodon and Bluesky, after the post is live.
+- **A web UI** for writing, editing, deleting and sharing posts, uploading files, and seeing which
+  apps have access.
+- **A container image** (non-root, read-only filesystem) published to GHCR by CI, which smoke-tests
+  the real image before pushing.
+
+Not built: the optional signed webhook for `/syndicate`, fetching `like-of` targets' microformats
+(`enrich_post_data`), HEIC photos, and a live path preview in the forms. The infra role that
+deploys it lives in the infra repo. See [`docs/specs/`](docs/specs/00-overview.md).
 
 ## Run it locally
 
@@ -34,7 +49,8 @@ Posts land in `./dev/site/content/`. The server listens on
 `http://127.0.0.1:8000`. Micropub clients need HTTPS, so for a real client
 test, put a tunnel in front of it.
 
-Useful commands (all work through `docker compose run --rm micropub-server …`):
+Useful commands (all work through `docker compose run --rm micropub-server …`, or
+`docker-compose` where the plugin is not installed):
 
 | Command | Does |
 | --- | --- |
@@ -42,6 +58,7 @@ Useful commands (all work through `docker compose run --rm micropub-server …`)
 | `hash-password` | Print an argon2id hash. Reads stdin when there is no terminal. |
 | `check` | Validate config and environment, and check the store. |
 | `migrate` | Apply database migrations. |
+| `import` | Load the posts already on the site. `--source PATH` reads a local checkout, `--dry-run` changes nothing, `--check-urls` asks the live site for every URL. |
 
 ## Develop
 
@@ -69,6 +86,8 @@ A working example is in [`dev/config.yaml`](dev/config.yaml).
 | `SECRET` | 16+ random characters |
 | `PASSWORD_HASH` | argon2id hash from `hash-password` (`PASSWORD_SECRET` accepts a bcrypt hash) |
 | `GITHUB_TOKEN` | Fine-grained token, Contents: Read and write, for the GitHub store |
+| `MASTODON_ACCESS_TOKEN` | Needed when `syndication.mastodon` is configured |
+| `BLUESKY_PASSWORD` | An app password, needed when `syndication.bluesky` is configured |
 
 ## Images
 

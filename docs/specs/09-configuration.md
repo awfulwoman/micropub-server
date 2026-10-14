@@ -44,6 +44,8 @@ application:
   locale: en-GB                    # month names in path tokens
   token_ttl_days: 90
   cache_ttl_seconds: 604800        # remote categories, client info, profiles
+  max_body_bytes: 26214400         # largest upload (/micropub, /media, forms with photos)
+  max_form_bytes: 65536            # largest body anywhere else
 
 publication:
   locale: en-GB
@@ -157,13 +159,20 @@ channels:                          # keyed by uid. The first is the default.
   bandnames: {name: Band names}
 
 syndication:
+  require_live: true            # fetch the post's public URL first; leave it queued if not served yet
   mastodon:
     url: https://indieweb.social
     user: awfulwoman
-    checked: true
+    checked: true               # ticked by default in clients
+    character_limit: 500
+    include_permalink: true
+    visibility: public          # public | unlisted | private
   # bluesky:
   #   handle: awfulwoman.com
+  #   service: https://bsky.social
   #   checked: false
+  #   include_permalink: true
+
 ```
 
 Notes:

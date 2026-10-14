@@ -104,7 +104,8 @@ Use maintained PyPI packages rather than hand-rolled code.
 
 ## Build phases
 
-Each phase ends deployable.
+Each phase ends deployable. **All five are built** (see the README for the few optional items
+that are not).
 
 1. **Auth and notes.** IndieAuth (password, consent, codes, tokens,
    introspection, metadata). Micropub create for notes, form-encoded and JSON.

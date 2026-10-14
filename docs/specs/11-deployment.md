@@ -59,8 +59,8 @@ Rules:
   `.env`.
 - **OCI labels:** set by `docker/metadata-action` (source, revision,
   created). Plus `org.opencontainers.image.description`.
-- **Size:** about 250 MB today (the slim Python base is about 120 MB). Image processing
-  libraries will add to it in phase 2. Do not optimise early.
+- **Size:** about 350 MB (the slim Python base is about 120 MB; Pillow and the Bluesky library
+  account for most of the rest). Not worth optimising yet.
 
 ### CLI subcommands in the image
 
