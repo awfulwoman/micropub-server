@@ -20,6 +20,8 @@ dependencies = [
     "python-slugify>=8.0",
     "mf2py>=2.0",
     "uuid-utils>=0.9",
+    "pillow>=12.3.0",
+    "filetype>=1.2.0",
 ]
 
 [dependency-groups]

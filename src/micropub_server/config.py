@@ -77,7 +77,14 @@ class MediaImage(_Model):
 class Media(_Model):
     max_bytes: int = 20_971_520
     image: MediaImage = Field(default_factory=MediaImage)
-    upload_path: str = "content/_uploads/{yyyy}/{MM}/{md5}.{ext}"
+    # Where uploads go (a Hugo static/ path, so they are served from the site root), and
+    # their public URL path. The URL defaults to the path without its leading "static/".
+    upload_path: str = "static/media/{yyyy}/{MM}/{md5}.{ext}"
+    upload_url: str | None = None
+
+    @property
+    def url_template(self) -> str:
+        return self.upload_url or self.upload_path.removeprefix("static/")
 
 
 class Template(_Model):

@@ -41,6 +41,15 @@ CONFIG = {
             "properties": ["name", "content"],
             "required_properties": ["name", "content"],
         },
+        "photo": {
+            "name": "Photo",
+            "post": {
+                "path": "content/photos/{yyyy}/{MM}/{dd}/{HH}{mm}/index.md",
+                "url": "photos/{yyyy}/{MM}/{dd}/{HH}{mm}/",
+            },
+            "properties": ["photo", "name", "content"],
+            "required_properties": ["photo"],
+        },
         "bookmark": {
             "name": "Bookmark",
             "discovery": "bookmark-of",
@@ -160,3 +169,13 @@ def no_network():
             text='<div class="h-app"><a class="u-url p-name" href="https://app.example/">Test app</a></div>',
         )
         yield router
+
+
+def jpeg_bytes(size=(64, 48), color=(200, 30, 30)) -> bytes:
+    import io
+
+    from PIL import Image
+
+    buf = io.BytesIO()
+    Image.new("RGB", size, color).save(buf, "JPEG")
+    return buf.getvalue()

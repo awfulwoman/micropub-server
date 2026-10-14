@@ -11,9 +11,14 @@ from urllib.parse import urljoin
 from uuid_utils import uuid7
 
 from .app import AppState
+from .media import Processed
 from .posts import discover_post_type, normalise, render_template
-from .stores import Put, StoreError
+from .stores import Move, Put, StoreError
 from .templates import render_post
+from .util import to_list
+
+UPLOAD = "upload:"  # placeholder URL for a file sent with the post: upload:<property>:<index>
+MEDIA_PROPERTIES = ("photo", "video", "audio")
 
 
 class MicropubError(Exception):
@@ -63,10 +68,93 @@ async def _taken(s: AppState, path: str, url: str) -> bool:
     return await s.store.exists(path)
 
 
-async def create_post(s: AppState, jf2: dict[str, Any], *, draft: bool) -> Created:
+def _unique_name(name: str, used: set[str]) -> str:
+    candidate, k = name, 2
+    stem, ext = posixpath.splitext(name)
+    while candidate in used:
+        candidate = f"{stem}-{k}{ext}"
+        k += 1
+    used.add(candidate)
+    return candidate
+
+
+async def _place_media(
+    s: AppState,
+    props: dict[str, Any],
+    post_path: str,
+    page_url: str,
+    uploads: dict[str, list[Processed]],
+    post_uid: str,
+) -> tuple[list, list]:
+    """Decide where each photo, video and audio file lives.
+
+    Returns (store changes, database actions to apply after the commit).
+    Files for a page-bundle post go next to its index.md; others go to static media.
+    """
+    from .media_service import Prepared, prepare_media
+
+    changes: list = []
+    actions: list = []
+    bundle_dir = posixpath.dirname(post_path) if post_path.endswith("/index.md") else None
+    used: set[str] = set()
+
+    for prop in MEDIA_PROPERTIES:
+        for entry in props.get(prop) or []:
+            url = entry["url"]
+            if url.startswith(UPLOAD):
+                _, source, index = url.split(":")
+                processed = uploads[source][int(index)]
+                if bundle_dir:
+                    name = _unique_name(processed.filename, used)
+                    path = f"{bundle_dir}/{name}"
+                    changes.append(Put(path, processed.content))
+                    prepared = Prepared(
+                        str(uuid7()),
+                        path,
+                        page_url + name,
+                        processed,
+                        props["published"],
+                        False,
+                        False,
+                    )
+                    actions.append(("insert", prepared, post_uid))
+                    entry["url"] = name
+                else:
+                    prepared = await prepare_media(s, processed)
+                    if not prepared.existing:
+                        changes.append(Put(prepared.path, processed.content))
+                    actions.append(
+                        ("insert", prepared, post_uid if not prepared.recorded else None)
+                    )
+                    entry["url"] = prepared.url.removeprefix(s.me.rstrip("/"))
+                continue
+
+            row = s.db.query(
+                "SELECT uid, path, post_uid FROM media WHERE url = ?", (urljoin(s.me, url),)
+            )
+            if bundle_dir and row and row[0]["post_uid"] is None:
+                name = _unique_name(posixpath.basename(row[0]["path"]), used)
+                new_path = f"{bundle_dir}/{name}"
+                changes.append(Move(row[0]["path"], new_path))
+                actions.append(("move", row[0]["uid"], new_path, page_url + name, post_uid))
+                entry["url"] = name
+    return changes, actions
+
+
+async def create_post(
+    s: AppState,
+    jf2: dict[str, Any],
+    *,
+    draft: bool,
+    uploads: dict[str, list[Processed]] | None = None,
+) -> Created:
     jf2.pop("uid", None)  # never trust a client-chosen uid
     if "mp-syndicate-to" in jf2 and not s.config.syndication:
         del jf2["mp-syndicate-to"]
+
+    uploads = uploads or {}
+    for prop, files in uploads.items():
+        jf2[prop] = to_list(jf2.get(prop)) + [f"{UPLOAD}{prop}:{i}" for i in range(len(files))]
 
     app = s.config.application
     props = normalise(
@@ -107,18 +195,40 @@ async def create_post(s: AppState, jf2: dict[str, Any], *, draft: bool) -> Creat
     props["post-type"] = post_type
     props["post-status"] = "draft" if draft else props.get("post-status", "published")
 
+    media_changes, media_actions = await _place_media(s, props, path, url, uploads, uid)
+
     content = render_post(props, s.config.template)
     message = s.config.publication.commit_message.format(
         action="create", post_type=post_type, file_type="post"
     )
     try:
-        await s.store.commit([Put(path, content.encode())], message)
+        await s.store.commit([Put(path, content.encode()), *media_changes], message)
     except StoreError as exc:
         raise MicropubError("store_error", str(exc), 502) from exc
 
-    s.db.execute(
-        "INSERT INTO posts (uid, url, path, post_type, post_status, published, properties)"
-        " VALUES (?, ?, ?, ?, ?, ?, ?)",
-        (uid, url, path, post_type, props["post-status"], props["published"], json.dumps(props)),
-    )
+    from .media_service import record_media
+
+    with s.db.transaction():
+        s.db.execute(
+            "INSERT INTO posts (uid, url, path, post_type, post_status, published, properties)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (
+                uid,
+                url,
+                path,
+                post_type,
+                props["post-status"],
+                props["published"],
+                json.dumps(props),
+            ),
+        )
+        for action in media_actions:
+            if action[0] == "insert":
+                record_media(s, action[1], action[2])
+            else:
+                _, media_uid, new_path, new_url, post_uid = action
+                s.db.execute(
+                    "UPDATE media SET path = ?, url = ?, post_uid = ? WHERE uid = ?",
+                    (new_path, new_url, post_uid, media_uid),
+                )
     return Created(url=url, path=path, uid=uid, post_type=post_type)

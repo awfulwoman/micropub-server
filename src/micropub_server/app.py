@@ -48,13 +48,14 @@ class AppState:
 
 
 def create_app(state: AppState) -> Starlette:
-    from . import routes_auth, routes_micropub, routes_system
+    from . import routes_auth, routes_media, routes_micropub, routes_system
     from .logs import AccessLogMiddleware
 
     routes: list[Route] = [
         *routes_system.routes(),
         *routes_auth.routes(),
         *routes_micropub.routes(),
+        *routes_media.routes(),
     ]
     app = Starlette(
         routes=routes,

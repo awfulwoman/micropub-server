@@ -143,9 +143,9 @@ def test_published_property_is_respected(client, bearer, site):
 
 
 def test_unconfigured_post_type_is_501(client, bearer):
-    r = client.post("/micropub", data={"like-of": "https://example.com/x"}, headers=bearer)
+    r = client.post("/micropub", data={"rsvp": "yes", "in-reply-to-x": "1"}, headers=bearer)
     assert r.status_code == 501 and r.json()["error"] == "not_implemented"
-    assert "like" in r.json()["error_description"]
+    assert "rsvp" in r.json()["error_description"]
 
 
 def test_mp_commands_never_reach_the_file(client, bearer, site):
@@ -213,13 +213,3 @@ def test_update_requires_url(client, bearer):
         "/micropub", json={"action": "update", "replace": {"content": ["x"]}}, headers=bearer
     )
     assert r.status_code == 400
-
-
-def test_multipart_files_not_yet_supported(client, bearer):
-    r = client.post(
-        "/micropub",
-        data={"content": "x"},
-        files={"photo": ("a.jpg", b"123", "image/jpeg")},
-        headers=bearer,
-    )
-    assert r.status_code == 501

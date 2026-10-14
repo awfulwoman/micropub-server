@@ -10,10 +10,11 @@ from starlette.responses import JSONResponse, Response
 from starlette.routing import Route
 
 from . import queries
-from .auth.service import TokenInfo
-from .http import bearer_token, oauth_error, state_of
+from .http import oauth_error, state_of
 from .jf2 import form_to_jf2, mf2_to_jf2
-from .publish import MicropubError, create_post
+from .media import MediaError, Processed, process_upload
+from .publish import MEDIA_PROPERTIES, MicropubError, create_post
+from .resource import authenticate
 from .scopes import check_scope
 
 ACTIONS = {"create", "update", "delete", "undelete"}
@@ -23,29 +24,32 @@ def _error(exc: MicropubError) -> JSONResponse:
     return oauth_error(exc.error, exc.description, exc.status, **exc.extra)
 
 
-def _authenticate(request: Request, form_token: str | None = None) -> TokenInfo:
-    header = bearer_token(request)
-    if header and form_token:
-        raise MicropubError(
-            "invalid_request", "Send the access token in the header or the body, not both"
-        )
-    token = header or form_token
-    if not token:
-        raise MicropubError("unauthorized", "An access token is required", 401)
-    info = state_of(request).auth.verify(token)
-    if info is None:
-        raise MicropubError("unauthorized", "The access token is invalid, expired or revoked", 401)
-    return info
-
-
-def _form_dict(form) -> dict[str, Any]:
-    out: dict[str, Any] = {}
+async def _form_dict(form, media_config) -> tuple[dict[str, Any], dict[str, list[Processed]]]:
+    """Split a form into text fields and processed uploads (photo, video, audio)."""
+    fields: dict[str, Any] = {}
+    uploads: dict[str, list[Processed]] = {}
     for key in form.keys():
         values = form.getlist(key)
-        if any(isinstance(v, UploadFile) for v in values):
-            raise MicropubError("not_implemented", "File uploads are not supported yet", 501)
-        out[key] = values if len(values) > 1 or key.endswith("[]") else values[0]
-    return out
+        files = [v for v in values if isinstance(v, UploadFile)]
+        if not files:
+            fields[key] = values if len(values) > 1 or key.endswith("[]") else values[0]
+            continue
+        prop = key.removesuffix("[]")
+        if prop not in MEDIA_PROPERTIES:
+            raise MicropubError("invalid_request", f"Files are not accepted in the {prop} field")
+        for upload in files:
+            try:
+                processed = process_upload(
+                    await upload.read(), upload.filename or "file", media_config
+                )
+            except MediaError as exc:
+                raise MicropubError("invalid_request", str(exc), exc.status) from exc
+            if processed.media_type != prop:
+                raise MicropubError(
+                    "invalid_request", f"A {processed.media_type} file was sent in the {prop} field"
+                )
+            uploads.setdefault(prop, []).append(processed)
+    return fields, uploads
 
 
 async def micropub_post(request: Request) -> Response:
@@ -61,12 +65,12 @@ async def micropub_post(request: Request) -> Response:
                 ) from exc
             if not isinstance(body, dict):
                 raise MicropubError("invalid_request", "The request body must be a JSON object")
-            form_token = None
+            form_token, uploads = None, {}
         else:
-            body = _form_dict(await request.form())
+            body, uploads = await _form_dict(await request.form(), s.config.media)
             form_token = body.get("access_token")
 
-        info = _authenticate(request, form_token)
+        info = authenticate(request, form_token)
 
         action = request.query_params.get("action") or body.get("action") or "create"
         if action not in ACTIONS:
@@ -86,7 +90,7 @@ async def micropub_post(request: Request) -> Response:
             )
 
         jf2 = mf2_to_jf2(body) if "json" in ctype else form_to_jf2(body)
-        created = await create_post(s, jf2, draft=allowed == "draft")
+        created = await create_post(s, jf2, draft=allowed == "draft", uploads=uploads)
     except MicropubError as exc:
         return _error(exc)
 
@@ -107,7 +111,7 @@ async def micropub_get(request: Request) -> Response:
         values = request.query_params.getlist(key)
         params[key] = values if key.endswith("[]") else values[-1]
     try:
-        _authenticate(request, params.pop("access_token", None))
+        authenticate(request, params.pop("access_token", None))
         q = params.get("q")
         if not q:
             raise MicropubError("invalid_request", "The q parameter is required")
