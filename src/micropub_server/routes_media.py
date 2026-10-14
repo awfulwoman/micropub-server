@@ -12,10 +12,10 @@ from starlette.routing import Route
 
 from .http import oauth_error, state_of
 from .media import MediaError, process_upload
-from .media_service import media_properties, prepare_media, record_media
+from .media_service import delete_media, media_properties, prepare_media, record_media
 from .publish import MicropubError
 from .resource import authenticate
-from .stores import Delete, Put, StoreError
+from .stores import Put, StoreError
 
 DEFAULT_LIMIT = 40
 MAX_LIMIT = 100
@@ -78,17 +78,10 @@ async def _delete(s, info, request: Request, form) -> Response:
     url = request.query_params.get("url") or form.get("url")
     if not url:
         raise MicropubError("invalid_request", "The url parameter is required")
-    rows = s.db.query("SELECT uid, path FROM media WHERE url = ?", (str(url),))
+    rows = s.db.query("SELECT * FROM media WHERE url = ?", (str(url),))
     if not rows:
         raise MicropubError("invalid_request", f"No media found at {url}")
-    message = s.config.publication.commit_message.format(
-        action="delete", post_type="media", file_type="file"
-    )
-    try:
-        await s.store.commit([Delete(rows[0]["path"])], message)
-    except StoreError as exc:
-        raise MicropubError("store_error", str(exc), 502) from exc
-    s.db.execute("DELETE FROM media WHERE uid = ?", (rows[0]["uid"],))
+    await delete_media(s, rows[0])
     return JSONResponse({"success": "delete", "success_description": f"File deleted from {url}"})
 
 

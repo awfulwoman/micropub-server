@@ -1,0 +1,13 @@
+{% extends "ui/layout.html" %}
+{% block title %}Upload a file{% endblock %}
+{% block content %}
+<h1>Upload a file</h1>
+{% if error %}<p class="notice error" role="alert">{{ error }}</p>{% endif %}
+<form method="post" action="/files/upload" enctype="multipart/form-data">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <label for="file">Photo, video or audio</label>
+  <input id="file" type="file" name="file" multiple required>
+  <p class="muted">Photos are turned the right way up, shrunk if very large, and stripped of location and camera details.</p>
+  <div class="actions"><button class="primary" type="submit">Upload</button></div>
+</form>
+{% endblock %}

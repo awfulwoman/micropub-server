@@ -232,6 +232,14 @@ class AuthService:
             (self._iso(self._now()), _sha256(token)),
         )
 
+    def revoke_id(self, token_hash: str) -> bool:
+        """Revoke by the identifier shown in the UI (the stored hash, never the token)."""
+        cursor = self.db.execute(
+            "UPDATE tokens SET revoked_at = ? WHERE token_hash = ? AND revoked_at IS NULL",
+            (self._iso(self._now()), token_hash),
+        )
+        return cursor.rowcount > 0
+
     def list_tokens(self) -> list[dict[str, Any]]:
         return [dict(r) for r in self.db.query("SELECT * FROM tokens ORDER BY issued_at DESC")]
 

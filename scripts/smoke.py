@@ -177,6 +177,20 @@ def run(base: str, name: str, site: Path) -> None:
         if r.status_code != 200 or "Edited" not in next(site.rglob("*.md")).read_text():
             fail(f"undelete failed: {r.status_code} {r.text}")
 
+        step("sign in to the web UI and see the post")
+        r = c.get("/static/app.css")
+        if r.status_code != 200 or "text/css" not in r.headers["content-type"]:
+            fail(f"static files are not served: {r.status_code}")
+        r = c.post("/login", data={"password": PASSWORD})
+        if r.status_code != 303 or "ms_session" not in r.headers.get("set-cookie", ""):
+            fail(f"UI login failed: {r.status_code}")
+        c.cookies.set("ms_session", r.cookies["ms_session"])
+        page = c.get("/posts")
+        if page.status_code != 200 or "Smoke" not in page.text and "Edited" not in page.text:
+            fail(f"posts list failed: {page.status_code} {page.text[:300]}")
+        if c.get("/posts/new/note").status_code != 200:
+            fail("the new note form did not render")
+
         step("check /new-password style routes do not exist and queries work")
         if c.get("/auth/new-password").status_code != 404:
             fail("/auth/new-password should not exist")

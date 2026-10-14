@@ -1,0 +1,21 @@
+{% extends "ui/layout.html" %}
+{% block title %}Files{% endblock %}
+{% block content %}
+<h1>Files</h1>
+{% if notice %}<p class="notice" role="status">{{ notice }}</p>{% endif %}
+<p><a class="button primary" href="/files/upload">Upload a file</a></p>
+{% if items %}
+<ul class="gallery">
+  {% for f in items %}
+  <li>
+    {% if f.kind == 'photo' %}<img src="{{ f.url }}" alt="" loading="lazy">{% endif %}
+    <small><code>{{ f.url }}</code></small><br>
+    <small>{{ f.published[:10] }}{% if f.post_title %} &middot; in <a href="/posts/{{ f.post_uid }}">{{ f.post_title }}</a>{% endif %}</small><br>
+    <a href="/files/{{ f.uid }}/delete">Delete</a>
+  </li>
+  {% endfor %}
+</ul>
+{% else %}
+<p class="muted">No files yet.</p>
+{% endif %}
+{% endblock %}

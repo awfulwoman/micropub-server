@@ -567,6 +567,8 @@ async def _confirm(
         "ui/confirm.html",
         row=row,
         title=_title(props, props.get("slug") or row["url"]),
+        subject=row["url"],
+        cancel_url=f"/posts/{row['uid']}",
         heading=heading,
         question=question,
         button=button,

@@ -1,0 +1,18 @@
+{% extends "ui/layout.html" %}
+{% block title %}Status{% endblock %}
+{% block content %}
+<h1>Status</h1>
+<dl class="props">
+  <dt>Version</dt><dd>{{ version }}</dd>
+  <dt>Publishing to</dt><dd><code>{{ store_name }}</code> ({{ store_uid }})</dd>
+  <dt>Store check</dt>
+  <dd>{% if store_problem %}<span class="error" role="alert">{{ store_problem }}</span>{% else %}working{% endif %}</dd>
+  <dt>Site's own settings</dt><dd>{{ site_config }}</dd>
+  <dt>Share to</dt><dd>{% for t in targets %}{{ t.name }}{% if not loop.last %}, {% endif %}{% else %}nothing configured{% endfor %}</dd>
+  <dt>Publication</dt><dd>{{ me }}</dd>
+</dl>
+<h2>Counts</h2>
+<dl class="props">
+  {% for label, value in counts %}<dt>{{ label }}</dt><dd>{{ value }}</dd>{% endfor %}
+</dl>
+{% endblock %}

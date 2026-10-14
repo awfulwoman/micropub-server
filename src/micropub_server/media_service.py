@@ -97,3 +97,19 @@ def media_properties(row) -> dict[str, Any]:
         "media-type": row["media_type"],
         "published": row["published"],
     }
+
+
+async def delete_media(s: AppState, row) -> None:
+    """Remove a file from the store and forget it. Raises MicropubError if the store fails."""
+    from .publish import MicropubError
+    from .stores import Delete, StoreError
+
+    message = s.config.publication.commit_message.format(
+        action="delete", post_type=row["media_type"], file_type="file"
+    )
+    try:
+        if await s.store.exists(row["path"]):
+            await s.store.commit([Delete(row["path"])], message)
+    except StoreError as exc:
+        raise MicropubError("store_error", str(exc), 502) from exc
+    s.db.execute("DELETE FROM media WHERE uid = ?", (row["uid"],))
