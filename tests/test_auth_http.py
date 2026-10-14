@@ -247,7 +247,8 @@ def test_revocation(client, token):
     assert client.post("/auth/revoke", data={"token": "mps_unknown"}).status_code == 200
 
 
-def test_userinfo_needs_profile_scope(client):
+def test_userinfo_needs_profile_scope(client, no_network):
+    no_network.get(ME).respond(200, headers={"content-type": "text/html"}, text="<html></html>")
     t = sign_in(client, scope="create")["access_token"]
     r = client.get("/auth/userinfo", headers={"Authorization": f"Bearer {t}"})
     assert r.status_code == 403 and r.json()["error"] == "insufficient_scope"

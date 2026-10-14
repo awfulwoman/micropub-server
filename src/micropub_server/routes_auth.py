@@ -12,6 +12,7 @@ from starlette.routing import Route
 
 from .auth.client import fetch_client_info, validate_redirect
 from .auth.passwords import verify_password
+from .auth.profile import get_profile
 from .auth.service import AuthError
 from .http import bearer_token, error_page, oauth_error, read_params, render, state_of, wants_form
 
@@ -210,8 +211,8 @@ async def consent_post(request: Request) -> Response:
     return _redirect(params, issuer, **extra)
 
 
-def _profile(request: Request) -> dict[str, str]:
-    return dict(state_of(request).config.publication.profile)
+async def _profile(request: Request) -> dict[str, str]:
+    return await get_profile(state_of(request))
 
 
 async def _redeem(request: Request) -> tuple[Any, dict[str, Any]] | JSONResponse:
@@ -249,8 +250,8 @@ async def authorization_post(request: Request) -> Response:
         return result
     data, _ = result
     body: dict[str, Any] = {"me": data.me}
-    if "profile" in (data.scope or "").split() and _profile(request):
-        body["profile"] = _profile(request)
+    if "profile" in (data.scope or "").split() and (profile := await _profile(request)):
+        body["profile"] = profile
     return _respond(request, body)
 
 
@@ -272,8 +273,8 @@ async def token_post(request: Request) -> Response:
         body = state_of(request).auth.issue_token(data)
     except AuthError as exc:
         return oauth_error(exc.error, exc.description, exc.status)
-    if "profile" in body["scope"].split() and _profile(request):
-        body["profile"] = _profile(request)
+    if "profile" in body["scope"].split() and (profile := await _profile(request)):
+        body["profile"] = profile
     return _respond(request, body)
 
 
@@ -304,7 +305,7 @@ async def userinfo(request: Request) -> Response:
         return oauth_error(
             "insufficient_scope", "The profile scope is required", 403, scope="profile"
         )
-    return JSONResponse(_profile(request))
+    return JSONResponse(await _profile(request))
 
 
 def routes() -> list[Route]:
