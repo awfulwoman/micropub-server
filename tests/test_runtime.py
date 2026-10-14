@@ -171,3 +171,17 @@ def test_import_command(env, tmp_path, capsys):
     assert "would import 1" in out and "note: 1" in out
     assert main(["import", "--source", str(site)]) == 0
     assert "imported 1" in capsys.readouterr().out
+
+
+def test_token_command_mints_a_working_token(env, capsys):
+    assert main(["token", "--scope", "update", "--label", "GitHub Actions"]) == 0
+    token = capsys.readouterr().out.strip()
+    assert token.startswith("mps_")
+    state = build_state(Settings())
+    info = state.auth.verify(token)
+    assert info is not None and info.scopes == {"update"} and info.client_id == "GitHub Actions"
+
+
+def test_token_command_rejects_bad_scopes(env, capsys):
+    assert main(["token", "--scope", "everything", "--label", "x"]) == 1
+    assert "scope" in capsys.readouterr().err.lower()

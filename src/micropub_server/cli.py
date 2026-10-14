@@ -58,6 +58,22 @@ def _migrate(_args) -> int:
     return 0
 
 
+def _token(args) -> int:
+    from .auth.service import AuthError
+
+    try:
+        state = _state()
+        minted = state.auth.mint_token(args.label, args.scope, args.days)
+    except ConfigError as exc:
+        print(f"config error: {exc}", file=sys.stderr)
+        return 1
+    except AuthError as exc:
+        print(f"error: {exc.description}", file=sys.stderr)
+        return 1
+    print(minted["access_token"])
+    return 0
+
+
 def _import(args) -> int:
     import asyncio
 
@@ -127,6 +143,13 @@ def main(argv: list[str] | None = None) -> int:
         ("migrate", _migrate, "apply database migrations, then exit"),
     ]:
         sub.add_parser(name, help=help_).set_defaults(func=func)
+    tok = sub.add_parser("token", help="print a new access token for a script, shown once")
+    tok.add_argument("--scope", required=True, help='for example "update" (space-separated)')
+    tok.add_argument("--label", required=True, help="a name for the app, shown on the apps page")
+    tok.add_argument(
+        "--days", type=int, help="how long it lasts (default: the configured token lifetime)"
+    )
+    tok.set_defaults(func=_token)
     imp = sub.add_parser("import", help="load existing posts from the site so they can be edited")
     imp.add_argument(
         "--source", help="a local checkout of the site repo (default: read through the store)"

@@ -192,6 +192,35 @@ class AuthService:
             "expires_in": int(self.token_ttl.total_seconds()),
         }
 
+    def mint_token(self, label: str, scope: str, days: int | None = None) -> dict[str, Any]:
+        """A token for a script (CI, a gateway tool), made from the command line instead of by sign-in."""
+        allowed = {"create", "update", "delete", "draft", "media", "profile"}
+        scopes = scope.split()
+        if not scopes or not set(scopes) <= allowed:
+            raise AuthError("invalid_scope", f"scope must be some of: {', '.join(sorted(allowed))}")
+        ttl = timedelta(days=days) if days else self.token_ttl
+        token = TOKEN_PREFIX + secrets.token_urlsafe(32)
+        now = self._now()
+        self.db.execute(
+            "INSERT INTO tokens (token_hash, code_hash, client_id, me, scope, issued_at, expires_at)"
+            " VALUES (?, NULL, ?, ?, ?, ?, ?)",
+            (
+                _sha256(token),
+                label,
+                self.me,
+                " ".join(scopes),
+                self._iso(now),
+                self._iso(now + ttl),
+            ),
+        )
+        return {
+            "access_token": token,
+            "token_type": "Bearer",
+            "scope": " ".join(scopes),
+            "me": self.me,
+            "expires_in": int(ttl.total_seconds()),
+        }
+
     def verify(self, token: str) -> TokenInfo | None:
         token_hash = _sha256(token)
         rows = self.db.query("SELECT * FROM tokens WHERE token_hash = ?", (token_hash,))

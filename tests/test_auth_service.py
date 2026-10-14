@@ -213,3 +213,26 @@ def test_cleanup_removes_expired(svc, clock):
     svc.cleanup()
     assert svc.db.query("SELECT * FROM auth_requests") == []
     assert svc.db.query("SELECT * FROM auth_codes") == []
+
+
+def test_mint_token_for_a_script(svc):
+    out = svc.mint_token("GitHub Actions", "update", days=365)
+    assert out["access_token"].startswith("mps_") and out["scope"] == "update"
+    info = svc.verify(out["access_token"])
+    assert info.client_id == "GitHub Actions" and info.scopes == {"update"}
+    assert out["expires_in"] == 365 * 86400
+
+
+def test_minted_tokens_are_stored_hashed_and_revocable(svc):
+    out = svc.mint_token("ci", "update create")
+    stored = [r["token_hash"] for r in svc.db.query("SELECT token_hash FROM tokens")]
+    assert out["access_token"] not in stored
+    svc.revoke(out["access_token"])
+    assert svc.verify(out["access_token"]) is None
+
+
+def test_mint_rejects_unknown_scopes(svc):
+    with pytest.raises(AuthError):
+        svc.mint_token("ci", "update rm-rf")
+    with pytest.raises(AuthError):
+        svc.mint_token("ci", "")

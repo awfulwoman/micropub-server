@@ -1,0 +1,38 @@
+# config.yaml for production (mounted read-only at /config/config.yaml).
+# Secrets are NOT here: they are environment variables (see README).
+application:
+  name: awfulwoman.com publishing
+  time_zone: Europe/Berlin
+  token_ttl_days: 90
+
+publication:
+  # Tag suggestions in the web UI and for Micropub clients: a list, or a URL to a JSON list.
+  # The site can publish one (for example a Hugo output at /tags/index.json).
+  categories: https://awfulwoman.com/tags/index.json
+  profile:
+    name: Charlie O'Hara
+
+store:
+  type: github
+  owner: awfulwoman
+  repo: awfulwoman.com
+  branch: main
+
+channels:
+  main: {name: Main}
+  bandnames: {name: Band names}
+
+# The site owns its post types and front matter mapping. If this file is missing or broken the
+# server falls back to the copies in this config, so keep a copy of docs/deploy/site-micropub.yaml's
+# post_types here if you want a fallback.
+site_config_path: data/micropub.yaml
+
+syndication:
+  require_live: true
+  mastodon:
+    url: https://indieweb.social
+    user: awfulwoman
+    checked: true
+  # bluesky:
+  #   handle: awfulwoman.com
+  #   checked: false
