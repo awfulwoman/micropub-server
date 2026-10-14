@@ -58,7 +58,7 @@ mapping:
   category: tags
   bookmark-of: bookmark_of
   # …
-omit: [uid, slug, url, publishDate]
+omit: [uid, slug, url, publishDate, channel]
 post_types:
   note:
     name: Note

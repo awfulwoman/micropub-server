@@ -87,7 +87,7 @@ template:
     in-reply-to: in_reply_to
     quotation-of: quote_of
     photo: images
-  omit: [uid, slug, url, publishDate]
+  omit: [uid, slug, url, publishDate, channel]
 
 post_types:
   note:

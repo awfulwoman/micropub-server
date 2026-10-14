@@ -5,3 +5,9 @@ __pycache__/
 /data/
 *.db
 .env
+*.py[oc]
+build/
+dist/
+*.egg-info/
+.ruff_cache/
+/dev/site/
