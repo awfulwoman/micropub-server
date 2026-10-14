@@ -78,8 +78,12 @@ Steps:
 **Collision rule (we differ from Indiekit).** Indiekit silently overwrites a
 post whose rendered URL matches an existing one. That happens, for example,
 with two untitled notes in the same minute under an `{HH}{mm}` path. Instead:
-if the path exists in the database **or** in the store, append `-2`, `-3`, …
-to the slug and render again. Never overwrite on create.
+if the path or URL exists in the database **or** the path exists in the store,
+append `-2`, `-3`, … and check again. Never overwrite on create. The suffix goes
+on the filename (`1910.md` becomes `1910-2.md`) or, for a page bundle
+(`…/index.md`), on the bundle directory (`hello/` becomes `hello-2/`), and on the
+last URL segment. It cannot go on the slug, because paths like `{HH}{mm}.md`
+contain no slug.
 
 **Ordering and failure.** Write to the store first. Commit the database
 record only after the store write succeeds. If the store fails, return

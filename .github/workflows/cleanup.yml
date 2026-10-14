@@ -1,0 +1,21 @@
+name: Clean up old images
+
+on:
+  schedule:
+    - cron: "17 3 * * 0" # weekly, Sunday 03:17 UTC
+  workflow_dispatch:
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+    steps:
+      # Keep the newest 10 versions, plus anything tagged latest or with a
+      # version number. Everything else (old sha-* and untagged layers) goes.
+      - uses: actions/delete-package-versions@v5
+        with:
+          package-name: micropub-server
+          package-type: container
+          min-versions-to-keep: 10
+          ignore-versions: '^(latest|\d+\.\d+(\.\d+)?)$'

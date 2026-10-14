@@ -1,0 +1,23 @@
+# Local development: build and run the real image against a directory on disk.
+#   cp .env.example .env   # then fill in PASSWORD_HASH (see README)
+#   docker compose up --build
+name: micropub-server
+services:
+  micropub-server:
+    build:
+      context: .
+      args:
+        APP_VERSION: dev
+    image: micropub-server:dev
+    ports:
+      - "127.0.0.1:8000:8000"
+    env_file: .env
+    volumes:
+      - ./dev/config.yaml:/config/config.yaml:ro
+      - ./dev/site:/site
+      - data:/data
+    read_only: true
+    tmpfs:
+      - /tmp
+volumes:
+  data:

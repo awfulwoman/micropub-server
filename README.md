@@ -12,7 +12,69 @@ Indiekit is the reference for behaviour, not for code.
 
 ## Status
 
-Specification only. No code yet.
+Phase 1 is built: IndieAuth, creating posts from form-encoded and JSON
+requests, the Micropub queries, the GitHub and file-system stores, the Hugo
+template, and the container. Not built yet: media uploads, update, delete and
+undelete, syndication, the import command and the web UI. See
+[`docs/specs/00-overview.md`](docs/specs/00-overview.md) for the phases.
+
+## Run it locally
+
+Everything runs as a container. You need Docker.
+
+```sh
+cp .env.example .env
+openssl rand -hex 32                                   # put this in SECRET
+docker compose build
+docker compose run --rm -T micropub-server hash-password <<< 'your password'   # put this in PASSWORD_HASH
+docker compose up
+```
+
+Posts land in `./dev/site/content/`. The server listens on
+`http://127.0.0.1:8000`. Micropub clients need HTTPS, so for a real client
+test, put a tunnel in front of it.
+
+Useful commands (all work through `docker compose run --rm micropub-server …`):
+
+| Command | Does |
+| --- | --- |
+| `serve` | Run the server. The default. |
+| `hash-password` | Print an argon2id hash. Reads stdin when there is no terminal. |
+| `check` | Validate config and environment, and check the store. |
+| `migrate` | Apply database migrations. |
+
+## Develop
+
+```sh
+uv sync
+uv run pytest                  # unit and HTTP tests
+uv run ruff check . && uv run ruff format .
+docker build -t micropub-server:smoke . && uv run python scripts/smoke.py micropub-server:smoke
+```
+
+The smoke test starts the built image, signs in through IndieAuth, posts a
+note and checks the file. CI runs it before publishing.
+
+## Configuration
+
+Structure lives in a YAML file (`CONFIG_FILE`, default `/config/config.yaml`).
+Secrets and per-deployment values are environment variables. Both are
+described in [`docs/specs/09-configuration.md`](docs/specs/09-configuration.md).
+A working example is in [`dev/config.yaml`](dev/config.yaml).
+
+| Variable | Purpose |
+| --- | --- |
+| `BASE_URL` | Public URL of this server |
+| `PUBLICATION_URL` | The site it publishes to (your IndieAuth identity) |
+| `SECRET` | 16+ random characters |
+| `PASSWORD_HASH` | argon2id hash from `hash-password` (`PASSWORD_SECRET` accepts a bcrypt hash) |
+| `GITHUB_TOKEN` | Fine-grained token, Contents: Read and write, for the GitHub store |
+
+## Images
+
+CI publishes `ghcr.io/awfulwoman/micropub-server` (amd64 and arm64) on every
+push to `main`, tagged `latest` and `sha-<short>`. Production pins the `sha-`
+tag.
 
 ## Specs
 

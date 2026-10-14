@@ -59,7 +59,8 @@ Rules:
   `.env`.
 - **OCI labels:** set by `docker/metadata-action` (source, revision,
   created). Plus `org.opencontainers.image.description`.
-- **Target size:** under 150 MB.
+- **Size:** about 250 MB today (the slim Python base is about 120 MB). Image processing
+  libraries will add to it in phase 2. Do not optimise early.
 
 ### CLI subcommands in the image
 
@@ -104,7 +105,7 @@ podderton and mail-archive-server.
    - Permissions: `contents: read`, `packages: write`.
    - QEMU and Buildx.
    - **Smoke test first.** Build `linux/amd64` with `load: true` (tag
-     `micropub-server:smoke`), then run `scripts/smoke.sh` against it:
+     `micropub-server:smoke`), then run `scripts/smoke.py` (Python, run with `uv run`) against it:
      - start it with a test config, the file-system store and a test
        password hash
      - wait for `/health` to return 200
@@ -136,9 +137,10 @@ podderton and mail-archive-server.
   later if the repo becomes public.
 - Link the package to the repo, which `metadata-action` labels do, so the
   repo's Actions token can push.
-- **Retention:** a scheduled workflow (weekly) deletes untagged versions and
-  `sha-*` tags older than 90 days. It keeps `latest`, semver tags and the
-  newest 10 `sha-*` tags. Use `actions/delete-package-versions`.
+- **Retention:** a weekly workflow (`cleanup.yml`, `actions/delete-package-versions`)
+  keeps the newest 10 versions plus `latest` and version-number tags, and
+  deletes the rest (old `sha-*` and untagged layers). The action cannot filter by
+  age, so this replaces the earlier "older than 90 days" rule.
 
 ### Which tag production runs
 
@@ -182,7 +184,8 @@ volumes:
   to validate the config.
 - Unit tests run outside the container for speed (`uv run pytest`). The
   smoke test runs against the container, both locally
-  (`scripts/smoke.sh`) and in CI.
+  (`scripts/smoke.py`) and in CI. The script keeps its working files under the repo, not `/tmp`,
+  because Colima and Docker Desktop share `$HOME` but not the system temp directory.
 
 ## Health
 

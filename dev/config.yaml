@@ -1,0 +1,34 @@
+# Development config: posts are written to ./dev/site instead of GitHub.
+application:
+  time_zone: Europe/Berlin
+
+store:
+  type: filesystem
+  directory: /site
+
+channels:
+  main: {name: Main}
+
+post_types:
+  note:
+    name: Note
+    post:
+      path: content/notes/{yyyy}/{MM}/{dd}/{HH}{mm}.md
+      url: notes/{yyyy}/{MM}/{dd}/{HH}{mm}/
+    properties: [content, category]
+    required_properties: [content]
+  article:
+    name: Post
+    post:
+      path: content/posts/{yyyy}/{slug}/index.md
+      url: posts/{slug}/
+    properties: [name, content, summary, category]
+    required_properties: [name, content]
+  bookmark:
+    name: Bookmark
+    discovery: bookmark-of
+    post:
+      path: content/bookmarks/{yyyy}/{MM}/{dd}/{HH}{mm}.md
+      url: bookmarks/{yyyy}/{MM}/{dd}/{HH}{mm}/
+    properties: [bookmark-of, name, content, category]
+    required_properties: [bookmark-of]

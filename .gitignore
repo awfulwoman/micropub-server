@@ -11,3 +11,4 @@ dist/
 *.egg-info/
 .ruff_cache/
 /dev/site/
+.smoke/

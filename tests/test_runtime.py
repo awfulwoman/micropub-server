@@ -82,6 +82,14 @@ def test_missing_config_file(env, monkeypatch):
         build_state(Settings())
 
 
+def test_config_path_is_a_directory(env, monkeypatch, tmp_path):
+    monkeypatch.setenv(
+        "CONFIG_FILE", str(tmp_path)
+    )  # what Docker creates for a missing bind-mount source
+    with pytest.raises(ConfigError, match="cannot read config file"):
+        build_state(Settings())
+
+
 def test_publication_url_must_be_https_url(env, monkeypatch):
     monkeypatch.setenv("PUBLICATION_URL", "not a url")
     with pytest.raises(ConfigError, match="PUBLICATION_URL"):

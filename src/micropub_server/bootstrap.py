@@ -57,6 +57,8 @@ def build_state(settings: Settings) -> AppState:
         config = load_config(path)
     except FileNotFoundError as exc:
         raise ConfigError(f"config file not found: {path}") from exc
+    except OSError as exc:
+        raise ConfigError(f"cannot read config file {path}: {exc.strerror}") from exc
     except ValidationError as exc:
         raise ConfigError(f"invalid config {path}: {exc}") from exc
 
