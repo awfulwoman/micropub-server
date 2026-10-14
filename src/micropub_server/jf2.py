@@ -24,12 +24,12 @@ def mf2_to_jf2(item: dict[str, Any]) -> dict[str, Any]:
     types = item.get("type") or ["h-entry"]
     jf2: dict[str, Any] = {"type": types[0].removeprefix("h-")}
     for key, values in (item.get("properties") or {}).items():
-        converted = [_convert_value(key, value) for value in values]
+        converted = [convert_value(key, value) for value in values]
         jf2[key] = converted[0] if len(converted) == 1 else converted
     return jf2
 
 
-def _convert_value(key: str, value: Any) -> Any:
+def convert_value(key: str, value: Any) -> Any:
     if isinstance(value, dict):
         if "type" in value:
             return mf2_to_jf2(value)

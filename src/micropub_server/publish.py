@@ -5,16 +5,19 @@ from __future__ import annotations
 import json
 import posixpath
 from dataclasses import dataclass
+from datetime import UTC
 from typing import Any
 from urllib.parse import urljoin
+from zoneinfo import ZoneInfo
 
 from uuid_utils import uuid7
 
 from .app import AppState
 from .media import Processed
 from .posts import discover_post_type, normalise, render_template
-from .stores import Move, Put, StoreError
+from .stores import Delete, Move, Put, StoreError
 from .templates import render_post
+from .update import UpdateError, apply_update
 from .util import to_list
 
 UPLOAD = "upload:"  # placeholder URL for a file sent with the post: upload:<property>:<index>
@@ -54,18 +57,37 @@ def _suffix(path: str, url_path: str, k: int) -> tuple[str, str]:
     return new_path, f"{url_path.rstrip('/')}-{k}{trailing}"
 
 
-def _count_same_day(s: AppState, post_type: str, published: str) -> int:
+def _count_same_day(s: AppState, post_type: str, published: str, exclude_uid: str = "") -> int:
     row = s.db.query(
-        "SELECT COUNT(*) FROM posts WHERE post_type = ? AND substr(published, 1, 10) = ?",
-        (post_type, published[:10]),
+        "SELECT COUNT(*) FROM posts WHERE post_type = ? AND substr(published, 1, 10) = ? AND uid != ?",
+        (post_type, published[:10], exclude_uid),
     )
     return row[0][0]
 
 
-async def _taken(s: AppState, path: str, url: str) -> bool:
-    if s.db.query("SELECT 1 FROM posts WHERE path = ? OR url = ?", (path, url)):
+async def _taken(s: AppState, path: str, url: str, exclude_uid: str = "") -> bool:
+    if s.db.query(
+        "SELECT 1 FROM posts WHERE (path = ? OR url = ?) AND uid != ?", (path, url, exclude_uid)
+    ):
         return True
     return await s.store.exists(path)
+
+
+async def _choose_path(
+    s: AppState, props: dict[str, Any], post_type: str, cfg, exclude_uid: str = ""
+) -> tuple[str, str]:
+    """Render a post's path and absolute URL, adding -2, -3 ... if they are taken."""
+    tz = s.config.application.time_zone
+    sep = s.config.publication.slug_separator
+    n = _count_same_day(s, post_type, props["published"], exclude_uid) + 1
+    path = render_template(cfg.post.path, props, tz=tz, n=n, separator=sep)
+    url_path = render_template(cfg.post.url or cfg.post.path, props, tz=tz, n=n, separator=sep)
+    candidate_path, candidate_url = path, url_path
+    for k in range(2, 100):
+        if not await _taken(s, candidate_path, absolute_url(s.me, candidate_url), exclude_uid):
+            return candidate_path, absolute_url(s.me, candidate_url)
+        candidate_path, candidate_url = _suffix(path, url_path, k)
+    raise MicropubError("invalid_request", "Could not find a free path for this post", 409)
 
 
 def _unique_name(name: str, used: set[str]) -> str:
@@ -148,7 +170,8 @@ async def create_post(
     draft: bool,
     uploads: dict[str, list[Processed]] | None = None,
 ) -> Created:
-    jf2.pop("uid", None)  # never trust a client-chosen uid
+    jf2.pop("uid", None)  # never trust a client-chosen uid or slug
+    jf2.pop("slug", None)
     if "mp-syndicate-to" in jf2 and not s.config.syndication:
         del jf2["mp-syndicate-to"]
 
@@ -173,23 +196,10 @@ async def create_post(
             "not_implemented", f"No post type is configured for {post_type} posts", 501
         )
 
-    sep = s.config.publication.slug_separator
-    n = _count_same_day(s, post_type, props["published"]) + 1
-    path = render_template(cfg.post.path, props, tz=app.time_zone, n=n, separator=sep)
-    url_path = render_template(
-        cfg.post.url or cfg.post.path, props, tz=app.time_zone, n=n, separator=sep
-    )
-
-    candidate_path, candidate_url = path, url_path
-    for k in range(2, 100):
-        if not await _taken(s, candidate_path, absolute_url(s.me, candidate_url)):
-            break
-        candidate_path, candidate_url = _suffix(path, url_path, k)
-    else:
-        raise MicropubError("invalid_request", "Could not find a free path for this post", 409)
-    path, url = candidate_path, absolute_url(s.me, candidate_url)
-
     uid = str(uuid7())
+    props["uid"] = uid  # so a {uuid} token in a path template works
+    path, url = await _choose_path(s, props, post_type, cfg)
+
     props["url"] = url
     props["uid"] = uid
     props["post-type"] = post_type
@@ -232,3 +242,174 @@ async def create_post(
                     (new_path, new_url, post_uid, media_uid),
                 )
     return Created(url=url, path=path, uid=uid, post_type=post_type)
+
+
+# --- update, delete, undelete ---------------------------------------------------
+@dataclass(frozen=True)
+class Updated:
+    url: str
+    changed: bool
+    moved: bool
+
+
+def _find_post(s: AppState, url: str):
+    rows = s.db.query("SELECT * FROM posts WHERE url IN (?, ?)", (url, url.rstrip("/") + "/"))
+    if not rows:
+        raise MicropubError("invalid_request", f"No post found at {url}")
+    return rows[0]
+
+
+def _message(s: AppState, action: str, post_type: str) -> str:
+    return s.config.publication.commit_message.format(
+        action=action, post_type=post_type, file_type="post"
+    )
+
+
+async def _commit(s: AppState, changes: list, message: str) -> None:
+    try:
+        await s.store.commit(changes, message)
+    except StoreError as exc:
+        raise MicropubError("store_error", str(exc), 502) from exc
+
+
+def _comparable(props: dict[str, Any]) -> dict[str, Any]:
+    return {
+        k: v
+        for k, v in props.items()
+        if k not in {"updated", "url", "post-type"} and not k.startswith("mp-")
+    }
+
+
+async def update_post(
+    s: AppState,
+    url: str,
+    *,
+    add: Any = None,
+    replace: Any = None,
+    delete: Any = None,
+    draft_mode: bool = False,
+) -> Updated:
+    row = _find_post(s, url)
+    if row["deleted"]:
+        raise MicropubError("invalid_request", f"The post at {url} has been deleted")
+    old = json.loads(row["properties"])
+    if draft_mode and old.get("post-status") != "draft":
+        raise MicropubError(
+            "insufficient_scope", "The update scope is required", 403, scope="update"
+        )
+
+    try:
+        edited = apply_update(old, add=add, replace=replace, delete=delete)
+    except UpdateError as exc:
+        raise MicropubError("invalid_request", str(exc)) from exc
+    if draft_mode:
+        edited["post-status"] = "draft"
+
+    app = s.config.application
+    props = normalise(
+        edited,
+        tz=app.time_zone,
+        me=s.me,
+        slug_separator=s.config.publication.slug_separator,
+        channels=list(s.config.channels),
+        now=s.clock(),
+    )
+    post_type = discover_post_type(s.post_types, props)
+    cfg = s.post_types.get(post_type)
+    if cfg is None:
+        raise MicropubError(
+            "not_implemented", f"No post type is configured for {post_type} posts", 501
+        )
+    props["uid"], props["post-type"] = row["uid"], post_type
+
+    old_path, old_url = row["path"], row["url"]
+    shape_changed = (
+        post_type != row["post_type"]
+        or props["slug"] != old.get("slug")
+        or props["published"] != old.get("published")
+    )
+    same_file = render_post(_comparable(props) | {"url": ""}, s.template) == render_post(
+        _comparable(old) | {"url": ""}, s.template
+    )
+    if same_file and not shape_changed:
+        return Updated(url=row["url"], changed=False, moved=False)
+
+    if shape_changed:
+        new_path, new_url = await _choose_path(s, props, post_type, cfg, exclude_uid=row["uid"])
+    else:
+        new_path, new_url = old_path, old_url
+    moved = new_path != old_path
+
+    props["url"] = new_url
+    props["updated"] = (
+        s.clock()
+        .astimezone(ZoneInfo(app.time_zone) if app.time_zone != "client" else UTC)
+        .isoformat(timespec="seconds")
+    )
+    content = render_post(props, s.template).encode()
+
+    changes: list = [Move(old_path, new_path, content) if moved else Put(old_path, content)]
+    media_rows = []
+    if moved and old_path.endswith("/index.md") and new_path.endswith("/index.md"):
+        new_dir = posixpath.dirname(new_path)
+        for m in s.db.query("SELECT uid, path FROM media WHERE post_uid = ?", (row["uid"],)):
+            name = posixpath.basename(m["path"])
+            changes.append(Move(m["path"], f"{new_dir}/{name}"))
+            media_rows.append((f"{new_dir}/{name}", new_url + name, m["uid"]))
+    await _commit(s, changes, _message(s, "update", post_type))
+
+    with s.db.transaction():
+        s.db.execute(
+            "UPDATE posts SET url = ?, path = ?, post_type = ?, post_status = ?, published = ?,"
+            " updated = ?, properties = ? WHERE uid = ?",
+            (
+                new_url,
+                new_path,
+                post_type,
+                props["post-status"],
+                props["published"],
+                props["updated"],
+                json.dumps(props),
+                row["uid"],
+            ),
+        )
+        for path, media_url, media_uid in media_rows:
+            s.db.execute(
+                "UPDATE media SET path = ?, url = ? WHERE uid = ?", (path, media_url, media_uid)
+            )
+    return Updated(url=new_url, changed=True, moved=moved or new_url != old_url)
+
+
+async def delete_post(s: AppState, url: str) -> str:
+    row = _find_post(s, url)
+    if row["deleted"]:
+        return row["url"]  # already gone: nothing to do
+    props = json.loads(row["properties"])
+    if await s.store.exists(row["path"]):
+        await _commit(s, [Delete(row["path"])], _message(s, "delete", row["post_type"]))
+    kept = {
+        k: props[k] for k in ("post-type", "published", "slug", "type", "uid", "url") if k in props
+    }
+    now = s.clock().astimezone(UTC).isoformat(timespec="seconds")
+    s.db.execute(
+        "UPDATE posts SET deleted = ?, deleted_properties = ?, properties = ? WHERE uid = ?",
+        (now, row["properties"], json.dumps({**kept, "deleted": now}), row["uid"]),
+    )
+    return row["url"]
+
+
+async def undelete_post(s: AppState, url: str, *, draft_mode: bool = False) -> str:
+    row = _find_post(s, url)
+    if not row["deleted"] or not row["deleted_properties"]:
+        raise MicropubError("invalid_request", f"The post at {url} has not been deleted")
+    props = json.loads(row["deleted_properties"])
+    if draft_mode:
+        props["post-status"] = "draft"
+    content = render_post(props, s.template).encode()
+    await _commit(s, [Put(row["path"], content)], _message(s, "undelete", row["post_type"]))
+    s.db.execute(
+        "UPDATE posts SET deleted = NULL, deleted_properties = NULL, post_status = ?, properties = ?"
+        " WHERE uid = ?",
+        (props.get("post-status", "published"), json.dumps(props), row["uid"]),
+    )
+    return row["url"]

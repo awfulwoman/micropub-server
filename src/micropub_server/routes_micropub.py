@@ -13,7 +13,14 @@ from . import queries
 from .http import oauth_error, state_of
 from .jf2 import form_to_jf2, mf2_to_jf2
 from .media import MediaError, Processed, process_upload
-from .publish import MEDIA_PROPERTIES, MicropubError, create_post
+from .publish import (
+    MEDIA_PROPERTIES,
+    MicropubError,
+    create_post,
+    delete_post,
+    undelete_post,
+    update_post,
+)
 from .resource import authenticate
 from .scopes import check_scope
 
@@ -84,9 +91,53 @@ async def micropub_post(request: Request) -> Response:
         url = request.query_params.get("url") or body.get("url")
         if action != "create" and not url:
             raise MicropubError("invalid_request", "The url parameter is required")
-        if action != "create":
-            raise MicropubError(
-                "not_implemented", f"The {action} action is not implemented yet", 501
+        if action == "update":
+            if "json" not in ctype:
+                raise MicropubError("invalid_request", "Updates must be sent as JSON")
+            if not any(k in body for k in ("add", "replace", "delete")):
+                raise MicropubError("invalid_request", "An update needs add, replace or delete")
+            done = await update_post(
+                s,
+                str(url),
+                add=body.get("add"),
+                replace=body.get("replace"),
+                delete=body.get("delete"),
+                draft_mode=allowed == "draft",
+            )
+            if not done.changed:
+                return JSONResponse(
+                    {
+                        "success": "update",
+                        "success_description": f"Post at {done.url} not updated as no properties changed",
+                    },
+                    headers={"Location": done.url},
+                )
+            if done.moved:
+                return JSONResponse(
+                    {
+                        "success": "update",
+                        "success_description": f"Post updated and moved to {done.url}",
+                    },
+                    status_code=201,
+                    headers={"Location": done.url},
+                )
+            return JSONResponse(
+                {"success": "update", "success_description": f"Post updated at {done.url}"},
+                headers={"Location": done.url},
+            )
+        if action == "delete":
+            deleted_url = await delete_post(s, str(url))
+            return JSONResponse(
+                {"success": "delete", "success_description": f"Post deleted from {deleted_url}"}
+            )
+        if action == "undelete":
+            restored = await undelete_post(s, str(url), draft_mode=allowed == "draft")
+            return JSONResponse(
+                {
+                    "success": "delete_undelete",
+                    "success_description": f"Post restored to {restored}",
+                },
+                headers={"Location": restored},
             )
 
         jf2 = mf2_to_jf2(body) if "json" in ctype else form_to_jf2(body)

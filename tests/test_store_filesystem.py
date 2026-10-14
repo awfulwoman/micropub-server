@@ -43,3 +43,19 @@ async def test_written_files_are_world_readable(tmp_path):
     await s.commit([Put("a/b.md", b"x")], "m")
     mode = (tmp_path / "a" / "b.md").stat().st_mode & 0o777
     assert mode & 0o044 == 0o044
+
+
+async def test_deleting_the_last_file_prunes_empty_directories(tmp_path):
+    # Git has no empty directories; the dev store should not leave them behind either
+    s = FileSystemStore(tmp_path)
+    await s.commit([Put("a/b/c/x.md", b"1"), Put("a/keep.md", b"2")], "m")
+    await s.commit([Delete("a/b/c/x.md")], "m")
+    assert not (tmp_path / "a" / "b").exists()
+    assert (tmp_path / "a" / "keep.md").exists() and tmp_path.exists()
+
+
+async def test_moving_prunes_the_old_directory(tmp_path):
+    s = FileSystemStore(tmp_path)
+    await s.commit([Put("old/index.md", b"1")], "m")
+    await s.commit([Move("old/index.md", "new/index.md")], "m")
+    assert not (tmp_path / "old").exists() and (tmp_path / "new" / "index.md").exists()

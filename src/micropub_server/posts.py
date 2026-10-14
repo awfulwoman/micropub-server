@@ -171,10 +171,13 @@ def normalise(
     if "syndication" in p:
         p["syndication"] = to_list(p["syndication"])
 
-    p["slug"] = get_slug(p, slug_separator)
+    # A slug is fixed once chosen: editing a title must not move a published post.
+    if "mp-slug" in p or "slug" not in p:
+        p["slug"] = get_slug(p, slug_separator)
 
     if channels:
         wanted = [c for c in to_list(p.pop("mp-channel", None)) if c in channels]
+        wanted = wanted or [c for c in to_list(p.get("channel")) if c in channels]  # keep on update
         p["channel"] = list(dict.fromkeys(wanted)) or [channels[0]]
     else:
         p.pop("mp-channel", None)

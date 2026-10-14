@@ -67,10 +67,15 @@ class FileSystemStore:
             raise
 
     def _delete(self, path: str) -> None:
+        target = self._path(path)
         try:
-            self._path(path).unlink()
+            target.unlink()
         except FileNotFoundError as exc:
             raise StoreError(f"not found: {path}", 404) from exc
+        parent = target.parent
+        while parent != self.root and not any(parent.iterdir()):
+            parent.rmdir()
+            parent = parent.parent
 
     async def check(self) -> str | None:
         if not self.root.is_dir():

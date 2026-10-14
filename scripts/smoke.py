@@ -126,14 +126,15 @@ def run(base: str, name: str, site: Path) -> None:
     with httpx.Client(base_url=base, follow_redirects=False, timeout=10) as c:
         r = c.get("/auth", params={
             "response_type": "code", "client_id": CLIENT_ID, "redirect_uri": REDIRECT_URI,
-            "state": "smoke", "scope": "create", "code_challenge": challenge.decode(),
+            "state": "smoke", "scope": "create update delete", "code_challenge": challenge.decode(),
             "code_challenge_method": "S256",
         })  # fmt: skip
         if r.status_code != 302:
             fail(f"/auth returned {r.status_code}: {r.text[:200]}")
         consent = urlsplit(r.headers["location"])
         r = c.post(
-            f"{consent.path}?{consent.query}", data={"password": PASSWORD, "scope": ["create"]}
+            f"{consent.path}?{consent.query}",
+            data={"password": PASSWORD, "scope": ["create", "update", "delete"]},
         )
         if r.status_code != 302:
             fail(f"consent returned {r.status_code}: {r.text[:200]}")
@@ -159,6 +160,22 @@ def run(base: str, name: str, site: Path) -> None:
         files = list(site.rglob("*.md"))
         if len(files) != 1 or "Smoke test" not in files[0].read_text():
             fail(f"expected one note file, found {files}")
+
+        step("update the note, then delete it")
+        auth = {"Authorization": f"Bearer {token}"}
+        r = c.post(
+            "/micropub",
+            json={"action": "update", "url": location, "replace": {"content": ["Edited"]}},
+            headers=auth,
+        )
+        if r.status_code != 200 or "Edited" not in files[0].read_text():
+            fail(f"update failed: {r.status_code} {r.text}")
+        r = c.post("/micropub", data={"action": "delete", "url": location}, headers=auth)
+        if r.status_code != 200 or list(site.rglob("*.md")):
+            fail(f"delete failed: {r.status_code} {r.text}")
+        r = c.post("/micropub", data={"action": "undelete", "url": location}, headers=auth)
+        if r.status_code != 200 or "Edited" not in next(site.rglob("*.md")).read_text():
+            fail(f"undelete failed: {r.status_code} {r.text}")
 
         step("check /new-password style routes do not exist and queries work")
         if c.get("/auth/new-password").status_code != 404:

@@ -124,12 +124,15 @@ def source_one(s: AppState, params: dict[str, Any]) -> dict[str, Any]:
     if params.get("url"):
         url = str(params["url"])
         rows = s.db.query(
-            "SELECT properties FROM posts WHERE url IN (?, ?)", (url, url.rstrip("/") + "/")
+            "SELECT properties FROM posts WHERE deleted IS NULL AND url IN (?, ?)",
+            (url, url.rstrip("/") + "/"),
         )
         if not rows:
             raise MicropubError("invalid_request", f"No post found at {url}", 400)
     else:
-        rows = s.db.query("SELECT properties FROM posts WHERE uid = ?", (str(params["uid"]),))
+        rows = s.db.query(
+            "SELECT properties FROM posts WHERE deleted IS NULL AND uid = ?", (str(params["uid"]),)
+        )
         if not rows:
             raise MicropubError("not_found", "No post found with that uid", 404)
     return _select_properties(jf2_to_mf2(json.loads(rows[0][0])), wanted)
