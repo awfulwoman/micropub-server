@@ -50,6 +50,52 @@ CONFIG = {
             "properties": ["photo", "name", "content"],
             "required_properties": ["photo"],
         },
+        "like": {
+            "name": "Like",
+            "post": {
+                "path": "content/likes/{yyyy}/{MM}/{dd}/{HH}{mm}.md",
+                "url": "likes/{yyyy}/{MM}/{dd}/{HH}{mm}/",
+            },
+        },
+        "reply": {
+            "name": "Reply",
+            "post": {
+                "path": "content/replies/{yyyy}/{MM}/{dd}/{HH}{mm}.md",
+                "url": "replies/{yyyy}/{MM}/{dd}/{HH}{mm}/",
+            },
+        },
+        "repost": {
+            "name": "Repost",
+            "post": {
+                "path": "content/reposts/{yyyy}/{MM}/{dd}/{HH}{mm}.md",
+                "url": "reposts/{yyyy}/{MM}/{dd}/{HH}{mm}/",
+            },
+        },
+        "quote": {
+            "name": "Quote",
+            "discovery": "quotation-of",
+            "post": {
+                "path": "content/quotes/{yyyy}/{MM}/{dd}/{HH}{mm}.md",
+                "url": "quotes/{yyyy}/{MM}/{dd}/{HH}{mm}/",
+            },
+        },
+        "checkin": {
+            "name": "Checkin",
+            "discovery": "checkin",
+            "discovery_first": True,
+            "post": {
+                "path": "content/checkins/{yyyy}/{MM}/{dd}/{HH}{mm}/index.md",
+                "url": "checkins/{yyyy}/{MM}/{dd}/{HH}{mm}/",
+            },
+        },
+        "bandname": {
+            "name": "Band name",
+            "channel": "bandnames",
+            "post": {
+                "path": "content/bandnames/{yyyy}/{MM}/{slug}.md",
+                "url": "bandnames/{yyyy}/{MM}/{slug}/",
+            },
+        },
         "bookmark": {
             "name": "Bookmark",
             "discovery": "bookmark-of",

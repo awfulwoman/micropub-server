@@ -143,7 +143,7 @@ def test_published_property_is_respected(client, bearer, site):
 
 
 def test_unconfigured_post_type_is_501(client, bearer):
-    r = client.post("/micropub", data={"rsvp": "yes", "in-reply-to-x": "1"}, headers=bearer)
+    r = client.post("/micropub", data={"rsvp": "yes"}, headers=bearer)
     assert r.status_code == 501 and r.json()["error"] == "not_implemented"
     assert "rsvp" in r.json()["error_description"]
 

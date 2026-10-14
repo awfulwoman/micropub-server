@@ -166,8 +166,8 @@ async def create_post(
         now=s.clock(),
     )
 
-    post_type = discover_post_type(s.config.post_types, props)
-    cfg = s.config.post_types.get(post_type)
+    post_type = discover_post_type(s.post_types, props)
+    cfg = s.post_types.get(post_type)
     if cfg is None:
         raise MicropubError(
             "not_implemented", f"No post type is configured for {post_type} posts", 501
@@ -197,7 +197,7 @@ async def create_post(
 
     media_changes, media_actions = await _place_media(s, props, path, url, uploads, uid)
 
-    content = render_post(props, s.config.template)
+    content = render_post(props, s.template)
     message = s.config.publication.commit_message.format(
         action="create", post_type=post_type, file_type="post"
     )

@@ -2,21 +2,27 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from importlib import resources
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
+from pydantic import ValidationError
+from ruamel.yaml import YAML
+from ruamel.yaml.error import YAMLError
 from starlette.applications import Starlette
 from starlette.middleware import Middleware
 from starlette.routing import Route
 
 from .auth.client import Resolver, system_resolver
 from .auth.service import AuthService
-from .config import Config, Settings
+from .config import Config, PostType, Settings, SiteOverlay, Template
 from .db import Database
-from .stores import Store
+from .stores import Store, StoreError
+
+log = logging.getLogger("micropub_server")
 
 
 @dataclass
@@ -29,6 +35,8 @@ class AppState:
     resolver: Resolver = system_resolver
     clock: Callable[[], datetime] = lambda: datetime.now(UTC)
     store_problem: str | None = None
+    site: SiteOverlay | None = None
+    site_config_status: str = "disabled"
     jinja: Environment = field(init=False)
 
     def __post_init__(self) -> None:
@@ -45,6 +53,47 @@ class AppState:
     @property
     def me(self) -> str:
         return self.auth.me
+
+    @property
+    def post_types(self) -> dict[str, PostType]:
+        """The site's list of post types if it provides one, else the local config's."""
+        return (
+            self.site.post_types if self.site and self.site.post_types else None
+        ) or self.config.post_types
+
+    @property
+    def template(self) -> Template:
+        base = self.config.template
+        if not self.site:
+            return base
+        return Template(
+            type=base.type,
+            front_matter=base.front_matter,
+            mapping=self.site.mapping if self.site.mapping is not None else base.mapping,
+            omit=self.site.omit if self.site.omit is not None else base.omit,
+        )
+
+    async def refresh_site_config(self) -> None:
+        """Read the site's own data/micropub.yaml. Keep working if it is missing or broken."""
+        path = self.config.site_config_path
+        if not path:
+            self.site, self.site_config_status = None, "disabled"
+            return
+        try:
+            raw = await self.store.read(path)
+            data = YAML(typ="safe").load(raw) or {}
+            self.site = SiteOverlay.model_validate(data)
+            self.site_config_status = "ok"
+        except StoreError as exc:
+            if exc.status != 404 and self.site:  # transient: keep the last good copy
+                self.site_config_status = "stale"
+                log.warning("could not refresh %s, keeping the last good copy: %s", path, exc)
+            else:
+                self.site, self.site_config_status = None, "fallback"
+                log.warning("site config %s unavailable, using the local config: %s", path, exc)
+        except (YAMLError, ValidationError) as exc:
+            self.site, self.site_config_status = None, "fallback"
+            log.warning("site config %s is invalid, using the local config: %s", path, exc)
 
 
 def create_app(state: AppState) -> Starlette:

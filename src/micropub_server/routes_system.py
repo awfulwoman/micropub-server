@@ -31,6 +31,8 @@ async def health(request: Request) -> Response:
         "db": db,
         "version": s.settings.app_version,
     }
+    if s.site_config_status != "disabled":
+        body["site_config"] = s.site_config_status
     return JSONResponse(body, status_code=200 if db == "ok" else 503)
 
 
@@ -40,6 +42,7 @@ async def _housekeeping(state) -> None:
         try:
             state.auth.cleanup()
             state.db.checkpoint()
+            await state.refresh_site_config()
         except Exception:
             log.exception("housekeeping failed")
 
@@ -48,6 +51,7 @@ async def _housekeeping(state) -> None:
 async def lifespan(app: Starlette) -> AsyncIterator[None]:
     state = app.state.s
     state.store_problem = await state.store.check()
+    await state.refresh_site_config()
     if state.store_problem:
         log.error("store check failed: %s", state.store_problem)
     state.auth.cleanup()

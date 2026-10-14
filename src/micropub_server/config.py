@@ -114,6 +114,15 @@ class Channel(_Model):
     name: str
 
 
+class SiteOverlay(_Model):
+    """The site-owned file (data/micropub.yaml): the shape of its own content (spec 06)."""
+
+    version: int = 1
+    mapping: dict[str, str] | None = None
+    omit: list[str] | None = None
+    post_types: dict[str, PostType] | None = None
+
+
 class Config(_Model):
     application: Application = Field(default_factory=Application)
     publication: Publication = Field(default_factory=Publication)

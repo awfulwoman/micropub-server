@@ -57,7 +57,7 @@ def post_types_list(s: AppState) -> list[dict[str, Any]]:
             "properties": cfg.properties,
             "required-properties": cfg.required_properties,
         }
-        for name, cfg in s.config.post_types.items()
+        for name, cfg in s.post_types.items()
     ]
 
 
