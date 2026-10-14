@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime
 from typing import Any
 from urllib.parse import urlencode, urljoin
+from zoneinfo import ZoneInfo
 
 import nh3
 from starlette.requests import Request
@@ -16,7 +18,8 @@ from . import ui
 from .auth.passwords import verify_password
 from .forms import LABELS, LINKS, PHOTO_SLOTS, build_post, type_fields, type_required
 from .http import state_of
-from .publish import MicropubError, create_post
+from .jf2 import jf2_to_mf2
+from .publish import MicropubError, create_post, delete_post, undelete_post, update_post
 from .queries import _cursor, _decode_cursor, get_categories
 from .templates import render_post
 from .ui import page, safe_next, signed_in
@@ -204,16 +207,45 @@ async def new_post(request: Request, session: dict[str, Any]) -> Response:
     return page(request, "ui/new.html", types=types, bookmarklet=_bookmarklet(s))
 
 
+NEW_BUTTONS = [("publish", "Publish", True), ("draft", "Save as draft", False)]
+
+
 async def _form_page(
-    request, key, cfg, *, status=200, error=None, errors=None, values=None, prefill=None
+    request,
+    key,
+    cfg,
+    *,
+    status=200,
+    error=None,
+    errors=None,
+    values=None,
+    prefill=None,
+    edit_row=None,
 ):
     s = state_of(request)
+    editing = edit_row is not None
+    if editing:
+        draft = edit_row["post_status"] == "draft"
+        buttons = [("save", "Save changes", not draft)]
+        buttons += (
+            [("publish", "Publish", True)] if draft else [("draft", "Revert to draft", False)]
+        )
+        heading = f"Edit {cfg.name.lower()}"
+        action = f"/posts/{edit_row['uid']}/edit"
+    else:
+        buttons, heading, action = NEW_BUTTONS, f"New {cfg.name.lower()}", f"/posts/new/{key}"
     return page(
         request,
         "ui/form.html",
         status,
         type_key=key,
         type_name=cfg.name,
+        heading=heading,
+        form_action=action,
+        buttons=buttons,
+        button_name="action" if editing else "status",
+        editing=editing,
+        existing_photos=_photos_of(edit_row) if editing else [],
         fields=type_fields(key, cfg),
         required=set(type_required(key, cfg)),
         links=set(LINKS),
@@ -225,9 +257,22 @@ async def _form_page(
         errors=errors or {},
         values=values or {},
         prefill=prefill or {},
-        example_path=cfg.post.path,
+        example_path=edit_row["path"] if editing else cfg.post.path,
         preview_path=f"/posts/new/{key}/preview",
     )
+
+
+def _photos_of(row) -> list[dict[str, str]]:
+    props = json.loads(row["properties"])
+    return [
+        {
+            "src": urljoin(row["url"], p["url"]),
+            "alt": p.get("alt", ""),
+            "name": p["url"].rsplit("/", 1)[-1],
+        }
+        for p in props.get("photo", []) or []
+        if isinstance(p, dict) and p.get("url")
+    ]
 
 
 @signed_in
@@ -327,8 +372,281 @@ async def post_page(request: Request, session: dict[str, Any]) -> Response:
         details=details,
         copies=copies,
         notice=notice,
+        waiting=bool(props.get("mp-syndicate-to")) and not deleted and bool(s.targets),
         file_text=render_post(props, s.template) if not deleted else "",
     )
+
+
+# --- editing ------------------------------------------------------------------------------------------------
+def _local_time(s, iso: str) -> str:
+    dt = datetime.fromisoformat(iso)
+    tz = s.config.application.time_zone
+    return (dt.astimezone(ZoneInfo(tz)) if tz != "client" else dt).strftime("%Y-%m-%dT%H:%M")
+
+
+def _prefill(s, props: dict[str, Any]) -> dict[str, Any]:
+    content = props.get("content")
+    out: dict[str, Any] = {
+        "name": props.get("name", ""),
+        "summary": props.get("summary", ""),
+        "content": (content.get("text") if isinstance(content, dict) else content) or "",
+        "category": ", ".join(map(str, props.get("category") or [])),
+        "published": _local_time(s, props["published"]),
+        "mp-slug": props.get("slug", ""),
+        "syndicate": props.get("mp-syndicate-to") or [],
+    }
+    for link in LINKS:
+        out[link] = props.get(link, "")
+    geo = props.get("location")
+    if isinstance(geo, dict):
+        out["location_lat"], out["location_lng"] = geo.get("latitude", ""), geo.get("longitude", "")
+    card = props.get("checkin")
+    if isinstance(card, dict):
+        out["checkin_name"] = card.get("name", "")
+        out["checkin_lat"], out["checkin_lng"] = card.get("latitude", ""), card.get("longitude", "")
+    return out
+
+
+def _number(value: Any) -> float | None:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _diff(
+    s, fields: list[str], props: dict[str, Any], new: dict[str, Any], prefill: dict[str, Any]
+):
+    """The Micropub update operations that turn the stored post into what the form now says."""
+    replace: dict[str, list[Any]] = {}
+    delete: list[str] = []
+
+    def set_(key: str, value: Any, changed: bool, present: bool) -> None:
+        if changed and present:
+            replace[key] = [value]
+        elif changed:
+            delete.append(key)
+
+    for prop in fields:
+        if prop in LINKS or prop in {"name", "summary"}:
+            old, value = props.get(prop), new.get(prop)
+            set_(prop, value, (old or None) != (value or None), bool(value))
+        elif prop == "content":
+            old = props.get("content")
+            old = (old.get("text") if isinstance(old, dict) else old) or ""
+            value = new.get("content", "")
+            set_("content", value, old.strip() != value.strip(), bool(value))
+        elif prop == "category":
+            old, value = list(props.get("category") or []), list(new.get("category") or [])
+            if old != value:
+                if value:
+                    replace["category"] = value
+                else:
+                    delete.append("category")
+        elif prop == "location":
+            old, value = props.get("location"), new.get("location")
+            was = (
+                (_number(old.get("latitude")), _number(old.get("longitude")))
+                if isinstance(old, dict)
+                else None
+            )
+            now = tuple(float(x) for x in value.removeprefix("geo:").split(",")) if value else None
+            set_("location", value, was != now, bool(value))
+        elif prop == "checkin":
+            old, card = props.get("checkin") or {}, new.get("checkin")
+            was = (old.get("name"), _number(old.get("latitude")), _number(old.get("longitude")))
+            now = (
+                (card.get("name"), _number(card.get("latitude")), _number(card.get("longitude")))
+                if card
+                else None
+            )
+            set_(
+                "checkin",
+                jf2_to_mf2(card) if card else None,
+                (was if old else None) != now,
+                bool(card),
+            )
+
+    if new.get("published") and new["published"] != prefill["published"]:
+        replace["published"] = [new["published"]]
+    if new.get("mp-slug") and new["mp-slug"] != prefill["mp-slug"]:
+        replace["mp-slug"] = [new["mp-slug"]]
+    return replace, delete
+
+
+async def _load(request) -> Any:
+    s = state_of(request)
+    rows = s.db.query("SELECT * FROM posts WHERE uid = ?", (request.path_params["uid"],))
+    return rows[0] if rows else None
+
+
+def _back(uid: str, notice: str) -> RedirectResponse:
+    return RedirectResponse(f"/posts/{uid}?{urlencode({'notice': notice})}", status_code=303)
+
+
+@signed_in
+async def edit_form(request: Request, session: dict[str, Any]) -> Response:
+    s = state_of(request)
+    row = await _load(request)
+    if row is None:
+        return Response("No such post", status_code=404)
+    if row["deleted"]:
+        return _back(row["uid"], "This post is deleted. Restore it before editing.")
+    cfg = s.post_types.get(row["post_type"])
+    if cfg is None:
+        return Response("This post's type is not configured", status_code=409)
+    return await _form_page(
+        request,
+        row["post_type"],
+        cfg,
+        prefill=_prefill(s, json.loads(row["properties"])),
+        edit_row=row,
+    )
+
+
+@signed_in
+async def edit_submit(request: Request, session: dict[str, Any]) -> Response:
+    s = state_of(request)
+    row = await _load(request)
+    if row is None:
+        return Response("No such post", status_code=404)
+    form = await request.form()
+    if not ui.csrf_ok(session, form.get("csrf")):
+        return Response("Invalid form token", status_code=403)
+    cfg = s.post_types.get(row["post_type"])
+    if row["deleted"] or cfg is None:
+        return _back(row["uid"], "This post cannot be edited.")
+    key, props = row["post_type"], json.loads(row["properties"])
+    prefill = _prefill(s, props)
+    built = await build_post(key, cfg, form, s.config.media, None, editing=True)
+    if built.errors:
+        return await _form_page(
+            request, key, cfg, status=422, error="Some fields need attention.", errors=built.errors,
+            values=built.values, prefill=prefill, edit_row=row,
+        )  # fmt: skip
+
+    replace, delete = _diff(s, type_fields(key, cfg), props, built.jf2, prefill)
+    chosen = [str(v) for v in form.getlist("syndicate") if v]
+    if sorted(chosen) != sorted(prefill["syndicate"]) and s.targets:
+        if chosen:
+            replace["mp-syndicate-to"] = chosen
+        else:
+            delete.append("mp-syndicate-to")
+    action = form.get("action")
+    if action == "publish" and row["post_status"] != "published":
+        replace["post-status"] = ["published"]
+    elif action == "draft" and row["post_status"] != "draft":
+        replace["post-status"] = ["draft"]
+    if not replace and not delete:
+        return _back(row["uid"], "Nothing changed.")
+    try:
+        done = await update_post(s, row["url"], replace=replace or None, delete=delete or None)
+    except MicropubError as exc:
+        return await _form_page(
+            request, key, cfg, status=502 if exc.error == "store_error" else 422, error=exc.description,
+            values=built.values, prefill=prefill, edit_row=row,
+        )  # fmt: skip
+    if done.moved:
+        return _back(row["uid"], f"Saved. The post moved to {done.url}")
+    return _back(row["uid"], "Saved." if done.changed else "Nothing changed.")
+
+
+async def _confirm(
+    request, session, *, action: str, heading: str, question: str, button: str, danger: bool
+):
+    row = await _load(request)
+    if row is None:
+        return None, Response("No such post", status_code=404)
+    props = json.loads(
+        row["deleted_properties"]
+        if row["deleted"] and row["deleted_properties"]
+        else row["properties"]
+    )
+    return row, page(
+        request,
+        "ui/confirm.html",
+        row=row,
+        title=_title(props, props.get("slug") or row["url"]),
+        heading=heading,
+        question=question,
+        button=button,
+        danger=danger,
+        action=f"/posts/{row['uid']}/{action}",
+    )
+
+
+@signed_in
+async def delete_form(request: Request, session: dict[str, Any]) -> Response:
+    row, response = await _confirm(
+        request, session, action="delete", heading="Delete this post?", button="Delete", danger=True,
+        question="The file is removed from the site's repository. You can restore it afterwards.",
+    )  # fmt: skip
+    return response
+
+
+@signed_in
+async def delete_submit(request: Request, session: dict[str, Any]) -> Response:
+    s = state_of(request)
+    row = await _load(request)
+    if row is None:
+        return Response("No such post", status_code=404)
+    form = await request.form()
+    if not ui.csrf_ok(session, form.get("csrf")):
+        return Response("Invalid form token", status_code=403)
+    try:
+        await delete_post(s, row["url"])
+    except MicropubError as exc:
+        return _back(row["uid"], exc.description)
+    return RedirectResponse(
+        f"/posts?{urlencode({'notice': 'Deleted. You can restore it from the Deleted filter.'})}",
+        status_code=303,
+    )
+
+
+@signed_in
+async def undelete_form(request: Request, session: dict[str, Any]) -> Response:
+    row, response = await _confirm(
+        request, session, action="undelete", heading="Restore this post?", button="Restore", danger=False,
+        question="The file comes back at its old address.",
+    )  # fmt: skip
+    return response
+
+
+@signed_in
+async def undelete_submit(request: Request, session: dict[str, Any]) -> Response:
+    s = state_of(request)
+    row = await _load(request)
+    if row is None:
+        return Response("No such post", status_code=404)
+    form = await request.form()
+    if not ui.csrf_ok(session, form.get("csrf")):
+        return Response("Invalid form token", status_code=403)
+    try:
+        await undelete_post(s, row["url"])
+    except MicropubError as exc:
+        return _back(row["uid"], exc.description)
+    return _back(row["uid"], "Restored.")
+
+
+@signed_in
+async def share_now(request: Request, session: dict[str, Any]) -> Response:
+    s = state_of(request)
+    row = await _load(request)
+    if row is None:
+        return Response("No such post", status_code=404)
+    form = await request.form()
+    if not ui.csrf_ok(session, form.get("csrf")):
+        return Response("Invalid form token", status_code=403)
+    from .syndication.service import run_syndication
+
+    try:
+        result = await run_syndication(s, row["url"])
+    except MicropubError as exc:
+        return _back(row["uid"], exc.description)
+    note = "Shared." if result.syndicated else result.message
+    if result.failed:
+        note = f"Could not share to: {', '.join(result.failed)}. It will be tried again."
+    return _back(row["uid"], note)
 
 
 def routes() -> list:
@@ -342,5 +660,12 @@ def routes() -> list:
         Route("/posts/new/{type}", new_form, methods=["GET"]),
         Route("/posts/new/{type}", new_submit, methods=["POST"]),
         Route("/posts/{uid}", post_page),
+        Route("/posts/{uid}/edit", edit_form, methods=["GET"]),
+        Route("/posts/{uid}/edit", edit_submit, methods=["POST"]),
+        Route("/posts/{uid}/delete", delete_form, methods=["GET"]),
+        Route("/posts/{uid}/delete", delete_submit, methods=["POST"]),
+        Route("/posts/{uid}/undelete", undelete_form, methods=["GET"]),
+        Route("/posts/{uid}/undelete", undelete_submit, methods=["POST"]),
+        Route("/posts/{uid}/syndicate", share_now, methods=["POST"]),
         Mount("/static", StaticFiles(packages=[("micropub_server", "static")]), name="static"),
     ]

@@ -9,6 +9,19 @@
   {% if row.post_status == 'draft' %}<span class="badge draft">draft</span>{% endif %}
 </p>
 {% if not deleted %}<p><a href="{{ row.url }}">{{ row.url }}</a></p>{% endif %}
+<div class="actions">
+  {% if deleted %}
+  <a class="button primary" href="/posts/{{ row.uid }}/undelete">Restore</a>
+  {% else %}
+  <a class="button primary" href="/posts/{{ row.uid }}/edit">Edit</a>
+  {% if waiting %}
+  <form method="post" action="/posts/{{ row.uid }}/syndicate">
+    <input type="hidden" name="csrf" value="{{ csrf }}"><button type="submit">Share now</button>
+  </form>
+  {% endif %}
+  <a class="button danger" href="/posts/{{ row.uid }}/delete">Delete</a>
+  {% endif %}
+</div>
 
 {% if preview_html %}<div class="preview">{{ preview_html | safe }}</div>{% endif %}
 {% if photos %}

@@ -1,34 +1,35 @@
 {% extends "ui/layout.html" %}
-{% block title %}New {{ type_name | lower }}{% endblock %}
+{% block title %}{{ heading }}{% endblock %}
+{% macro val(key, default="") %}{{ values[key] if key in values else prefill.get(key, default) }}{% endmacro %}
 {% macro err(field) %}{% if errors.get(field) %}<p class="field-error" role="alert" id="{{ field }}-error">{{ errors[field] }}</p>{% endif %}{% endmacro %}
 {% block content %}
-<h1>New {{ type_name | lower }}</h1>
+<h1>{{ heading }}</h1>
 {% if error %}<p class="notice error" role="alert">{{ error }}</p>{% endif %}
-<form method="post" action="/posts/new/{{ type_key }}" enctype="multipart/form-data" data-preview-path="{{ preview_path }}">
+<form method="post" action="{{ form_action }}" enctype="multipart/form-data" data-preview-path="{{ preview_path }}">
   <input type="hidden" name="csrf" value="{{ csrf }}">
   {% for f in fields %}
     {% if f in links %}
       <label for="f-{{ f }}">{{ labels[f] }}{% if f in required %} <span class="hint">(required)</span>{% endif %}</label>
-      <input id="f-{{ f }}" type="url" name="{{ f }}" inputmode="url" value="{{ values.get(f, prefill.get(f, '')) }}"
+      <input id="f-{{ f }}" type="url" name="{{ f }}" inputmode="url" value="{{ val(f) }}"
              placeholder="https://" {{ 'required' if f in required }} aria-describedby="{{ f }}-error">
       {{ err(f) }}
     {% elif f == 'name' %}
       <label for="f-name">{{ labels.name }}{% if 'name' in required %} <span class="hint">(required)</span>{% endif %}</label>
-      <input id="f-name" type="text" name="name" value="{{ values.get('name', prefill.get('name', '')) }}" {{ 'required' if 'name' in required }}>
+      <input id="f-name" type="text" name="name" value="{{ val('name') }}" {{ 'required' if 'name' in required }}>
       {{ err('name') }}
     {% elif f == 'content' %}
       <label for="f-content">{{ labels.content }}{% if 'content' in required %} <span class="hint">(required)</span>{% endif %}
         <span class="hint">Markdown</span></label>
-      <textarea id="f-content" name="content" {{ 'required' if 'content' in required }}>{{ values.get('content', prefill.get('content', '')) }}</textarea>
+      <textarea id="f-content" name="content" {{ 'required' if 'content' in required }}>{{ val('content') }}</textarea>
       {{ err('content') }}
     {% elif f == 'summary' %}
       <label for="f-summary">{{ labels.summary }}</label>
-      <input id="f-summary" type="text" name="summary" value="{{ values.get('summary', '') }}">
+      <input id="f-summary" type="text" name="summary" value="{{ val('summary') }}">
     {% elif f == 'category' %}
       <label for="f-category">{{ labels.category }} <span class="hint">separate with commas</span></label>
-      <input id="f-category" type="text" name="category" value="{{ values.get('category', '') }}" list="known-tags" autocomplete="off">
+      <input id="f-category" type="text" name="category" value="{{ val('category') }}" list="known-tags" autocomplete="off">
       <datalist id="known-tags">{% for t in tags %}<option value="{{ t }}">{% endfor %}</datalist>
-    {% elif f == 'photo' %}
+    {% elif f == 'photo' and not editing %}
       <fieldset>
         <legend>Photos{% if 'photo' in required %} <span class="hint">(required)</span>{% endif %}</legend>
         {% for i in range(slots) %}
@@ -44,8 +45,8 @@
       <fieldset>
         <legend>Location <span class="hint">optional</span></legend>
         <div class="row">
-          <input type="text" inputmode="decimal" name="location_lat" value="{{ values.get('location_lat', '') }}" placeholder="Latitude" aria-label="Latitude">
-          <input type="text" inputmode="decimal" name="location_lng" value="{{ values.get('location_lng', '') }}" placeholder="Longitude" aria-label="Longitude">
+          <input type="text" inputmode="decimal" name="location_lat" value="{{ val('location_lat') }}" placeholder="Latitude" aria-label="Latitude">
+          <input type="text" inputmode="decimal" name="location_lng" value="{{ val('location_lng') }}" placeholder="Longitude" aria-label="Longitude">
         </div>
         <button type="button" data-geo="location" hidden>Use my location</button>
         {{ err('location') }}
@@ -54,10 +55,10 @@
       <fieldset>
         <legend>Place{% if 'checkin' in required %} <span class="hint">(required)</span>{% endif %}</legend>
         <label for="f-checkin-name">Name</label>
-        <input id="f-checkin-name" type="text" name="checkin_name" value="{{ values.get('checkin_name', '') }}">
+        <input id="f-checkin-name" type="text" name="checkin_name" value="{{ val('checkin_name') }}">
         <div class="row">
-          <input type="text" inputmode="decimal" name="checkin_lat" value="{{ values.get('checkin_lat', '') }}" placeholder="Latitude" aria-label="Latitude">
-          <input type="text" inputmode="decimal" name="checkin_lng" value="{{ values.get('checkin_lng', '') }}" placeholder="Longitude" aria-label="Longitude">
+          <input type="text" inputmode="decimal" name="checkin_lat" value="{{ val('checkin_lat') }}" placeholder="Latitude" aria-label="Latitude">
+          <input type="text" inputmode="decimal" name="checkin_lng" value="{{ val('checkin_lng') }}" placeholder="Longitude" aria-label="Longitude">
         </div>
         <button type="button" data-geo="checkin" hidden>Use my location</button>
         {{ err('checkin') }}
@@ -65,12 +66,19 @@
     {% endif %}
   {% endfor %}
 
+  {% if editing and existing_photos %}
+  <fieldset>
+    <legend>Photos <span class="hint">these stay as they are</span></legend>
+    <ul class="gallery">{% for p in existing_photos %}<li><img src="{{ p.src }}" alt="{{ p.alt }}" loading="lazy"><small>{{ p.name }}</small></li>{% endfor %}</ul>
+  </fieldset>
+  {% endif %}
+
   {% if targets %}
   <fieldset>
     <legend>Share to</legend>
     {% for t in targets %}
     <label class="check"><input type="checkbox" name="syndicate" value="{{ t.uid }}"
-      {{ 'checked' if (t.uid in values.get('syndicate', [])) or (not values and t.checked) }}> {{ t.name }}</label>
+      {{ 'checked' if (t.uid in (values.get('syndicate') if values else prefill.get('syndicate', []))) or (not values and not editing and t.checked) }}> {{ t.name }}</label>
     {% endfor %}
   </fieldset>
   {% endif %}
@@ -78,15 +86,16 @@
   <details>
     <summary>More options</summary>
     <label for="f-published">Publication time <span class="hint">leave empty for now</span></label>
-    <input id="f-published" type="datetime-local" name="published" value="{{ values.get('published', '') }}">
-    <label for="f-slug">URL name <span class="hint">leave empty to choose one</span></label>
-    <input id="f-slug" type="text" name="mp-slug" value="{{ values.get('mp-slug', '') }}">
+    <input id="f-published" type="datetime-local" name="published" value="{{ val('published') }}">
+    <label for="f-slug">URL name <span class="hint">{{ 'changing this moves the post' if editing else 'leave empty to choose one' }}</span></label>
+    <input id="f-slug" type="text" name="mp-slug" value="{{ val('mp-slug') }}">
   </details>
-  <p class="muted" data-where>This will be saved to <code>{{ example_path }}</code></p>
+  <p class="muted" data-where>{{ "Saved at" if editing else "This will be saved to" }} <code>{{ example_path }}</code></p>
 
   <div class="actions">
-    <button class="primary" type="submit" name="status" value="publish">Publish</button>
-    <button type="submit" name="status" value="draft">Save as draft</button>
+    {% for value, label, primary in buttons %}
+    <button {{ 'class="primary"' | safe if primary }} type="submit" name="{{ button_name }}" value="{{ value }}">{{ label }}</button>
+    {% endfor %}
   </div>
 </form>
 {% endblock %}

@@ -1,0 +1,14 @@
+{% extends "ui/layout.html" %}
+{% block title %}{{ heading }}{% endblock %}
+{% block content %}
+<h1>{{ heading }}</h1>
+<p>{{ question }}</p>
+<div class="preview"><strong>{{ title }}</strong><br><small>{{ row.url }}</small></div>
+<form method="post" action="{{ action }}">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <div class="actions">
+    <button class="primary {{ 'danger' if danger }}" type="submit">{{ button }}</button>
+    <a class="button" href="/posts/{{ row.uid }}">Cancel</a>
+  </div>
+</form>
+{% endblock %}

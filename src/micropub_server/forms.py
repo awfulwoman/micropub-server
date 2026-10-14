@@ -89,13 +89,20 @@ def _coordinates(lat: str, lng: str) -> tuple[float, float] | None:
 
 
 async def build_post(
-    name: str, cfg: PostType, form: FormData, media: Media, channel: str | None
+    name: str,
+    cfg: PostType,
+    form: FormData,
+    media: Media,
+    channel: str | None,
+    *,
+    editing: bool = False,
 ) -> Built:
     """Read a form for one post type. Nothing is written; errors are returned per field."""
     built = Built()
     text = lambda key: str(form.get(key, "")).strip()  # noqa: E731
-    fields = type_fields(name, cfg)
-    required = set(type_required(name, cfg))
+    # Photos are not changed from the edit form: they belong to the post's bundle.
+    fields = [f for f in type_fields(name, cfg) if not (editing and f == "photo")]
+    required = set(type_required(name, cfg)) - ({"photo"} if editing else set())
     built.values = {k: v for k, v in form.items() if isinstance(v, str) and k not in {"csrf"}}
     built.values["photo_alt"] = [str(v) for v in form.getlist("photo_alt")]
     built.values["syndicate"] = [str(v) for v in form.getlist("syndicate")]
