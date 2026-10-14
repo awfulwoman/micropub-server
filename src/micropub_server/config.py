@@ -37,6 +37,9 @@ class Application(_Model):
     locale: str = "en-GB"
     token_ttl_days: int = 90
     cache_ttl_seconds: int = 604_800
+    # Largest request body, for the pages and endpoints that take uploads, and for everything else.
+    max_body_bytes: int = 26_214_400
+    max_form_bytes: int = 65_536
 
     @field_validator("time_zone")
     @classmethod

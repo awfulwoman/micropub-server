@@ -108,6 +108,7 @@ def create_app(state: AppState) -> Starlette:
         routes_ui_extra,
     )
     from .logs import AccessLogMiddleware
+    from .security import SecurityMiddleware
 
     routes: list[Route] = [
         *routes_system.routes(),
@@ -119,7 +120,7 @@ def create_app(state: AppState) -> Starlette:
     ]
     app = Starlette(
         routes=routes,
-        middleware=[Middleware(AccessLogMiddleware)],
+        middleware=[Middleware(SecurityMiddleware), Middleware(AccessLogMiddleware)],
         lifespan=routes_system.lifespan,
     )
     app.state.s = state
