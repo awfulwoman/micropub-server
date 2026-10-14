@@ -37,6 +37,10 @@ means that version. Where we differ on purpose, see
 - **Small and boring.** One process, SQLite, YAML config, no plugin loader.
 - **12-factor.** Config from a file plus environment variables, logs to
   stdout, state in one volume.
+- **Container only.** It ships as an OCI image published to
+  `ghcr.io/awfulwoman/micropub-server` by GitHub Actions, runs as a non-root
+  user, and is developed and smoke-tested as the same image
+  ([11](11-deployment.md)).
 
 ## Non-goals
 
@@ -101,8 +105,8 @@ Each phase ends deployable.
 
 1. **Auth and notes.** IndieAuth (password, consent, codes, tokens,
    introspection, metadata). Micropub create for notes, form-encoded and JSON.
-   `q=config`. GitHub store. Hugo template for notes. Container and health
-   check.
+   `q=config`. GitHub store. Hugo template for notes. Dockerfile,
+   `compose.yaml` for local runs, and the GHCR workflow with smoke test.
 2. **All post types.** Article, bookmark, like, reply, repost, photo,
    checkin, quote, bandname. Media endpoint with EXIF stripping. `q=source`, `q=category`,
    `q=syndicate-to`, `q=post-types`.

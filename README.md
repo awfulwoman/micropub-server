@@ -31,6 +31,6 @@ Start with [`docs/specs/00-overview.md`](docs/specs/00-overview.md).
 | [08 Syndication](docs/specs/08-syndication.md) | Mastodon and Bluesky cross-posting |
 | [09 Configuration](docs/specs/09-configuration.md) | YAML config and environment variables |
 | [10 Data model](docs/specs/10-data-model.md) | SQLite schema |
-| [11 Deployment](docs/specs/11-deployment.md) | Container, health, infra composition, cut-over |
+| [11 Deployment](docs/specs/11-deployment.md) | Container image, GHCR publishing, local dev, infra, cut-over |
 | [12 Indiekit divergences](docs/specs/12-indiekit-divergences.md) | Indiekit bugs and choices we do not copy |
 | [13 Web UI](docs/specs/13-web-ui.md) | Writing and managing posts in the browser, share bookmarklet |
