@@ -59,6 +59,7 @@ Useful commands (all work through `docker compose run --rm micropub-server …`,
 | `check` | Validate config and environment, and check the store. |
 | `migrate` | Apply database migrations. |
 | `token` | Print a new access token for a script, once: `token --scope update --label "GitHub Actions"`. |
+| `token` | Print a new access token for a script, shown once: `token --scope update --label "GitHub Actions"`. |
 | `import` | Load the posts already on the site. `--source PATH` reads a local checkout, `--dry-run` changes nothing, `--check-urls` asks the live site for every URL. |
 
 ## Develop
