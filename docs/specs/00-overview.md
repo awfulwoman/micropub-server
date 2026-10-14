@@ -103,19 +103,20 @@ Each phase ends deployable.
    `q=config`. GitHub store. Hugo template for notes. Container and health
    check.
 2. **All post types.** Article, bookmark, like, reply, repost, photo,
-   checkin. Media endpoint with EXIF stripping. `q=source`, `q=category`,
+   checkin, quote, bandname. Media endpoint with EXIF stripping. `q=source`, `q=category`,
    `q=syndicate-to`, `q=post-types`.
-3. **Editing.** Update (replace, add, delete), delete, undelete. Draft scope.
+3. **Editing and import.** Update (replace, add, delete), delete, undelete.
+   Draft scope. `import` command for existing posts.
 4. **Syndication.** Mastodon, then Bluesky. `/syndicate` endpoint.
 5. **Small admin UI.** List recent posts, show the source, re-run
    syndication. Optional.
 
-## Open questions
+## Decisions (2026-10-14)
 
-- Should the server read existing posts from the repo so `q=source` and
-  updates work for posts it did not create? Indiekit cannot. A one-off import
-  script reading `content/` would cover it.
-- Checkins: create them through Micropub (`checkin` property, h-card
-  location) or keep them historical only?
-- Quotes, bandnames and guinea pig profiles: custom post types through `h`
-  values, or out of scope?
+- **Discovery order:** a bookmark that has a photo is a **photo**, which
+  keeps Indiekit's order. Checkins are the exception (see
+  [05](05-post-model.md#post-type-discovery)).
+- **Import:** build `micropub-server import`, so `q=source` and updates work
+  on posts the server did not create ([10](10-data-model.md#import-command)).
+- **In scope:** checkins, quotes and bandnames are all supported post types
+  ([06](06-post-templates.md)). Guinea pig profiles stay out of scope.

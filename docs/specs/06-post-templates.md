@@ -53,7 +53,7 @@ awfulwoman.com today:
 | `video` | `videos` | list of URLs |
 | `audio` | `audio` | URL |
 | `location` (geo) | `place_geo: {lat, lng}` | |
-| `checkin` (h-card) | `place_name`, `place_geo` | from the h-card's `name`, `latitude`, `longitude` |
+| `checkin` (h-card) | `place_name`, `place_geo` | from the h-card's `name`, `latitude`, `longitude`. With no `name` on the post, set `title: "Checked in at {place_name}"`, as the existing checkins do. |
 | `syndication` | `syndication` | list of URLs |
 | `visibility` | `visibility` | |
 | `content.text` | body | not in the front matter |
@@ -81,10 +81,31 @@ directory structure, because `hugo.yaml` only sets a permalink for `posts`.
 | repost | `content/reposts/{yyyy}/{MM}/{dd}/{HH}{mm}.md` | `reposts/{yyyy}/{MM}/{dd}/{HH}{mm}/` | no |
 | quote | `content/quotes/{yyyy}/{MM}/{dd}/{HH}{mm}.md` | `quotes/{yyyy}/{MM}/{dd}/{HH}{mm}/` | no |
 | photo | `content/photos/{yyyy}/{MM}/{dd}/{HH}{mm}/index.md` | `photos/{yyyy}/{MM}/{dd}/{HH}{mm}/` | yes |
-| checkin | `content/checkins/{yyyy}/{MM}/{dd}/{HH}{mm}.md` | `checkins/{yyyy}/{MM}/{dd}/{HH}{mm}/` | no |
+| checkin | `content/checkins/{yyyy}/{MM}/{dd}/{HH}{mm}/index.md` | `checkins/{yyyy}/{MM}/{dd}/{HH}{mm}/` | yes (photos from Swarm) |
+| bandname | `content/bandnames/{yyyy}/{MM}/{slug}.md` | `bandnames/{yyyy}/{MM}/{slug}/` | no |
 
 Two posts of the same type in the same minute get `-2` from the collision
 rule in [03](03-micropub.md#create).
+
+## How each in-scope type arrives
+
+| Type | Sent by client as | Discovered by |
+| --- | --- | --- |
+| quote | `quotation-of=<url>` plus `content` (the quoted text). Optional `author` h-card. | `discovery: quotation-of` |
+| checkin | `checkin` = h-card (`name`, `latitude`, `longitude`, `url`), as OwnYourSwarm sends | `discovery: checkin`, `discovery_first: true` |
+| bandname | `name` only, with `mp-channel=bandnames`. The admin UI offers a "Band name" form. | channel binding (step 0 in [05](05-post-model.md#post-type-discovery)) |
+
+A bandname file has front matter only, with no body, matching
+`content/bandnames/2024/11/wifebiscuits.md`:
+
+```markdown
+---
+title: Wife Biscuits
+date: "2026-10-14T19:15:00+02:00"
+---
+```
+
+Bandnames are titled, so use `{slug}` in their path, not `{HH}{mm}`.
 
 ## Examples
 

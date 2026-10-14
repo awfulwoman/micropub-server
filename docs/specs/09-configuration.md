@@ -123,9 +123,38 @@ post_types:
       path: content/photos/{yyyy}/{MM}/{dd}/{HH}{mm}/{filename}
     properties: [photo, name, content, category, location]
     required_properties: [photo]
-  # like, reply, repost, quote, checkin: as in spec 06
+  quote:
+    name: Quote
+    discovery: quotation-of
+    post:
+      path: content/quotes/{yyyy}/{MM}/{dd}/{HH}{mm}.md
+      url: quotes/{yyyy}/{MM}/{dd}/{HH}{mm}/
+    properties: [quotation-of, content, author]
+    required_properties: [quotation-of, content]
+  checkin:
+    name: Checkin
+    discovery: checkin
+    discovery_first: true          # a checkin with a photo stays a checkin
+    post:
+      path: content/checkins/{yyyy}/{MM}/{dd}/{HH}{mm}/index.md
+      url: checkins/{yyyy}/{MM}/{dd}/{HH}{mm}/
+    media:
+      path: content/checkins/{yyyy}/{MM}/{dd}/{HH}{mm}/{filename}
+    properties: [checkin, content, photo, category]
+    required_properties: [checkin]
+  bandname:
+    name: Band name
+    channel: bandnames             # chosen by mp-channel=bandnames
+    post:
+      path: content/bandnames/{yyyy}/{MM}/{slug}.md
+      url: bandnames/{yyyy}/{MM}/{slug}/
+    properties: [name]
+    required_properties: [name]
+  # like, reply, repost: as in spec 06
 
-channels: {}                       # optional, keyed by uid: {name: …}
+channels:                          # keyed by uid. The first is the default.
+  main: {name: Main}
+  bandnames: {name: Band names}
 
 syndication:
   mastodon:

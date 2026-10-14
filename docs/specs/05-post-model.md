@@ -56,6 +56,16 @@ Run on every create and update, in this order:
 Based on the Post Type Discovery algorithm, with Indiekit's changes, checked
 in this order:
 
+0. **Explicit choice (our extension).** A post type wins outright when
+   either:
+   - `mp-channel` names a channel bound to it (`channel: bandnames` in its
+     config), or
+   - its `discovery` property is present **and** it has
+     `discovery_first: true`.
+
+   Bandnames need this. A bandname is only a `name`, which would otherwise
+   be a note. Checkins use `discovery_first`, so a checkin with a photo
+   (common from OwnYourSwarm) stays a checkin.
 1. `type == "event"`: **event**.
 2. A configured post type whose `h` value is not `entry` and equals `type`.
    This is for custom vocabularies.
@@ -71,10 +81,9 @@ in this order:
    | `photo` | photo |
    | a post type's configured `discovery` property, for example `bookmark-of` → bookmark, `checkin` → checkin, `quotation-of` → quote | that type |
 
-   **Note:** Indiekit adds configured discovery properties **after** the
-   built-in ones. So a bookmark that has a photo is typed `photo`. Keep this
-   order unless we decide otherwise. It is listed as a decision in
-   [12](12-indiekit-divergences.md).
+   Configured discovery properties come **after** the built-in ones, as in
+   Indiekit. So a bookmark that has a photo is typed `photo`. This was
+   decided on 2026-10-14. Use `discovery_first` (step 0) for exceptions.
 4. `children` is a non-empty list: **collection**.
 5. Has `name` **and** content (or `summary`): **article**. This departs from
    the PTD spec, which compares `name` with the start of the content. The
