@@ -117,6 +117,21 @@ class Channel(_Model):
     name: str
 
 
+class MastodonConfig(_Model):
+    url: str
+    user: str
+    checked: bool = True
+    character_limit: int = 500
+    include_permalink: bool = True
+    visibility: Literal["public", "unlisted", "private"] = "public"
+
+
+class Syndication(_Model):
+    mastodon: MastodonConfig | None = None
+    # Only syndicate once the post is live on the site (it is fetched first).
+    require_live: bool = True
+
+
 class SiteOverlay(_Model):
     """The site-owned file (data/micropub.yaml): the shape of its own content (spec 06)."""
 
@@ -135,7 +150,7 @@ class Config(_Model):
     template: Template = Field(default_factory=Template)
     post_types: dict[str, PostType] = Field(default_factory=dict)
     channels: dict[str, Channel] = Field(default_factory=dict)
-    syndication: dict[str, dict] = Field(default_factory=dict)
+    syndication: Syndication = Field(default_factory=Syndication)
     site_config_path: str | None = None
 
 

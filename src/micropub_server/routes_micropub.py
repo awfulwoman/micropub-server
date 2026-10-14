@@ -199,4 +199,34 @@ def routes() -> list[Route]:
     return [
         Route("/micropub", micropub_post, methods=["POST"]),
         Route("/micropub", micropub_get, methods=["GET"]),
+        Route("/syndicate", syndicate_post, methods=["POST"]),
     ]
+
+
+async def syndicate_post(request: Request) -> Response:
+    """Share posts that are waiting for their targets. Ping this after each site deploy."""
+    from .syndication.service import run_syndication
+
+    s = state_of(request)
+    try:
+        info = authenticate(request)
+        if "update" not in info.scopes:
+            raise MicropubError(
+                "insufficient_scope", "The update scope is required", 403, scope="update"
+            )
+        source_url = request.query_params.get("source_url")
+        if not source_url and "json" in request.headers.get("content-type", ""):
+            try:
+                body = await request.json()
+                source_url = (body.get("syndication") or {}).get("source_url") or body.get(
+                    "source_url"
+                )
+            except (ValueError, AttributeError):
+                source_url = None
+        result = await run_syndication(s, source_url)
+    except MicropubError as exc:
+        return _error(exc)
+    body = {"success": "OK", "success_description": result.message}
+    if result.failed:
+        body["failed"] = result.failed
+    return JSONResponse(body)

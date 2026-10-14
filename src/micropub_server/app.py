@@ -7,6 +7,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from importlib import resources
+from typing import Any
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from pydantic import ValidationError
@@ -36,6 +37,7 @@ class AppState:
     clock: Callable[[], datetime] = lambda: datetime.now(UTC)
     store_problem: str | None = None
     site: SiteOverlay | None = None
+    targets: list[Any] = field(default_factory=list)  # syndication targets
     site_config_status: str = "disabled"
     jinja: Environment = field(init=False)
 

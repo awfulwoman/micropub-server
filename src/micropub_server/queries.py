@@ -62,7 +62,7 @@ def post_types_list(s: AppState) -> list[dict[str, Any]]:
 
 
 def syndicate_to_list(s: AppState) -> list[dict[str, Any]]:
-    return []  # phase 4
+    return [t.info for t in s.targets]
 
 
 def slice_list(items: list[Any], params: dict[str, str]) -> list[Any]:

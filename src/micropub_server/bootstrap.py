@@ -13,6 +13,7 @@ from .config import Config, Settings, load_config
 from .db import Database
 from .stores import FileSystemStore, Store
 from .stores.github import GitHubStore
+from .syndication.mastodon import MastodonTarget
 
 
 class ConfigError(Exception):
@@ -67,4 +68,24 @@ def build_state(settings: Settings) -> AppState:
     auth = AuthService(
         db, me=settings.publication_url, token_ttl_days=config.application.token_ttl_days
     )
-    return AppState(config=config, settings=settings, db=db, auth=auth, store=store)
+    targets = []
+    if config.syndication.mastodon:
+        if not settings.mastodon_access_token:
+            raise ConfigError(
+                "MASTODON_ACCESS_TOKEN is required when syndication.mastodon is configured"
+            )
+        m = config.syndication.mastodon
+        targets.append(
+            MastodonTarget(
+                url=m.url,
+                user=m.user,
+                token=settings.mastodon_access_token,
+                checked=m.checked,
+                character_limit=m.character_limit,
+                include_permalink=m.include_permalink,
+                visibility=m.visibility,
+            )
+        )
+    return AppState(
+        config=config, settings=settings, db=db, auth=auth, store=store, targets=targets
+    )

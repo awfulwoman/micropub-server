@@ -7,7 +7,7 @@ import posixpath
 from dataclasses import dataclass
 from datetime import UTC
 from typing import Any
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlsplit
 from zoneinfo import ZoneInfo
 
 from uuid_utils import uuid7
@@ -88,6 +88,23 @@ async def _choose_path(
             return candidate_path, absolute_url(s.me, candidate_url)
         candidate_path, candidate_url = _suffix(path, url_path, k)
     raise MicropubError("invalid_request", "Could not find a free path for this post", 409)
+
+
+def _origin(url: str) -> str:
+    parts = urlsplit(url)
+    return f"{parts.scheme}://{parts.netloc}".lower()
+
+
+def resolve_targets(s: AppState, requested: Any) -> list[str]:
+    """The uids of configured targets that a client asked for, by uid or by origin."""
+    wanted = (
+        [r for r in to_list(requested) if isinstance(r, str)]
+        if not isinstance(requested, dict)
+        else []
+    )
+    return [
+        t.uid for t in s.targets if any(r == t.uid or _origin(r) == _origin(t.uid) for r in wanted)
+    ]
 
 
 def _unique_name(name: str, used: set[str]) -> str:
@@ -172,8 +189,12 @@ async def create_post(
 ) -> Created:
     jf2.pop("uid", None)  # never trust a client-chosen uid or slug
     jf2.pop("slug", None)
-    if "mp-syndicate-to" in jf2 and not s.config.syndication:
-        del jf2["mp-syndicate-to"]
+    if "mp-syndicate-to" in jf2:
+        known = resolve_targets(s, jf2["mp-syndicate-to"])
+        if known:
+            jf2["mp-syndicate-to"] = known
+        else:
+            del jf2["mp-syndicate-to"]
 
     uploads = uploads or {}
     for prop, files in uploads.items():
@@ -276,6 +297,10 @@ async def _commit(s: AppState, changes: list, message: str) -> None:
         raise MicropubError("store_error", str(exc), 502) from exc
 
 
+def _comparable_all(props: dict[str, Any]) -> dict[str, Any]:
+    return {k: v for k, v in props.items() if k not in {"updated", "url", "post-type"}}
+
+
 def _comparable(props: dict[str, Any]) -> dict[str, Any]:
     return {
         k: v
@@ -349,6 +374,12 @@ async def update_post(
         _comparable(old) | {"url": ""}, s.template
     )
     if same_file and not shape_changed:
+        if _comparable_all(props) != _comparable_all(old):
+            # only server-side commands changed (mp-syndicate-to ...): save them, nothing to commit
+            s.db.execute(
+                "UPDATE posts SET properties = ? WHERE uid = ?",
+                (json.dumps({**props, "url": old_url}, default=str), row["uid"]),
+            )
         return Updated(url=row["url"], changed=False, moved=False)
 
     if shape_changed:
