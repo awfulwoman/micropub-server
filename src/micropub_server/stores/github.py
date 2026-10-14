@@ -72,6 +72,22 @@ class GitHubStore:
             raise self._fail(f"read {path}", response)
         return base64.b64decode(response.json()["content"])
 
+    async def list_files(self, prefix: str) -> list[str]:
+        response = await self._request(
+            "GET", f"/git/trees/{self.branch}", params={"recursive": "1"}
+        )
+        if response.status_code != 200:
+            raise self._fail("list the repository", response)
+        data = response.json()
+        if data.get("truncated"):
+            raise StoreError(
+                "The repository is too large to list through the API; use a local checkout instead."
+            )
+        wanted = prefix.rstrip("/") + "/"
+        return sorted(
+            e["path"] for e in data["tree"] if e["type"] == "blob" and e["path"].startswith(wanted)
+        )
+
     async def commit(self, changes: list[Change], message: str) -> None:
         entries: list[tuple[str, bytes | None]] = []  # (path, content or None for delete)
         for change in changes:

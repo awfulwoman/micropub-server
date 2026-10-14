@@ -401,3 +401,11 @@ def test_undelete_commit_message(client, full, state, monkeypatch):
     monkeypatch.setattr(state.store, "commit", spy)
     undelete(client, full, url)
     assert seen == ["undelete note post"]
+
+
+def test_changing_a_bookmarked_url_updates_basedomain(client, full, site):
+    url = make(client, full, **{"bookmark-of": "https://www.one.example/a"})
+    path = "content/bookmarks/2026/10/14/1910.md"
+    assert fm(site, path)[0]["basedomain"] == "one.example"
+    update(client, full, url, replace={"bookmark-of": ["https://two.example/b"]})
+    assert fm(site, path)[0]["basedomain"] == "two.example"

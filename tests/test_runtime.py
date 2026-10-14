@@ -158,3 +158,16 @@ def test_check_reports_config_problem(env, monkeypatch, capsys):
 def test_migrate(env, tmp_path):
     assert main(["migrate"]) == 0
     assert (tmp_path / "data" / "micropub.db").exists()
+
+
+def test_import_command(env, tmp_path, capsys):
+    site = tmp_path / "site"
+    (site / "content/notes/2025").mkdir(parents=True)
+    (site / "content/notes/2025/hello.md").write_text(
+        "---\ntitle: Hello\ndate: '2025-02-11T18:55:20+01:00'\n---\nBody\n"
+    )
+    assert main(["import", "--source", str(site), "--dry-run"]) == 0
+    out = capsys.readouterr().out
+    assert "would import 1" in out and "note: 1" in out
+    assert main(["import", "--source", str(site)]) == 0
+    assert "imported 1" in capsys.readouterr().out

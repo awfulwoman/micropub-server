@@ -209,3 +209,9 @@ def test_render_template_unknown_token_left_alone():
         render_template("a/{nope}.md", {"published": "2026-10-14T19:10:47+02:00"}, tz=BERLIN)
         == "a/{nope}.md"
     )
+
+
+def test_normalise_updated_is_converted_like_published():
+    out = n({"updated": "2021-02-24T08:00:00.000Z"})
+    assert out["updated"] == "2021-02-24T09:00:00+01:00"  # Berlin is on CET in February
+    assert "updated" not in n({})

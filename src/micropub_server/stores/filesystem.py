@@ -37,6 +37,12 @@ class FileSystemStore:
         except FileNotFoundError as exc:
             raise StoreError(f"not found: {path}", 404) from exc
 
+    async def list_files(self, prefix: str) -> list[str]:
+        base = self._path(prefix)
+        if not base.is_dir():
+            return []
+        return sorted(p.relative_to(self.root).as_posix() for p in base.rglob("*") if p.is_file())
+
     async def commit(self, changes: list[Change], message: str) -> None:
         for change in changes:
             if isinstance(change, Put):

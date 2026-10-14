@@ -18,7 +18,7 @@ from .posts import discover_post_type, normalise, render_template
 from .stores import Delete, Move, Put, StoreError
 from .templates import render_post
 from .update import UpdateError, apply_update
-from .util import to_list
+from .util import base_domain, to_list
 
 UPLOAD = "upload:"  # placeholder URL for a file sent with the post: upload:<property>:<index>
 MEDIA_PROPERTIES = ("photo", "video", "audio")
@@ -195,6 +195,10 @@ async def create_post(
         raise MicropubError(
             "not_implemented", f"No post type is configured for {post_type} posts", 501
         )
+    if props.get("bookmark-of"):
+        props["basedomain"] = base_domain(
+            str(props["bookmark-of"])
+        )  # the layout shows "Original link on ..."
 
     uid = str(uuid7())
     props["uid"] = uid  # so a {uuid} token in a path template works
@@ -229,7 +233,7 @@ async def create_post(
                 post_type,
                 props["post-status"],
                 props["published"],
-                json.dumps(props),
+                json.dumps(props, default=str),
             ),
         )
         for action in media_actions:
@@ -314,13 +318,26 @@ async def update_post(
         channels=list(s.config.channels),
         now=s.clock(),
     )
-    post_type = discover_post_type(s.post_types, props)
+    # An edit only changes a post's type if it changes what discovery says about it. Otherwise a
+    # note with a title (which discovery calls an article) would jump sections on its first edit.
+    discovered = discover_post_type(s.post_types, props)
+    post_type = (
+        discovered if discovered != discover_post_type(s.post_types, old) else row["post_type"]
+    )
     cfg = s.post_types.get(post_type)
     if cfg is None:
         raise MicropubError(
             "not_implemented", f"No post type is configured for {post_type} posts", 501
         )
     props["uid"], props["post-type"] = row["uid"], post_type
+    if props.get("bookmark-of") != old.get("bookmark-of") and (
+        "basedomain" in props or "basedomain" in props.get("front-matter", {})
+    ):
+        props.get("front-matter", {}).pop("basedomain", None)
+        if props.get("bookmark-of"):
+            props["basedomain"] = base_domain(str(props["bookmark-of"]))
+        else:
+            props.pop("basedomain", None)
 
     old_path, old_url = row["path"], row["url"]
     shape_changed = (
@@ -369,7 +386,7 @@ async def update_post(
                 props["post-status"],
                 props["published"],
                 props["updated"],
-                json.dumps(props),
+                json.dumps(props, default=str),
                 row["uid"],
             ),
         )
@@ -410,6 +427,6 @@ async def undelete_post(s: AppState, url: str, *, draft_mode: bool = False) -> s
     s.db.execute(
         "UPDATE posts SET deleted = NULL, deleted_properties = NULL, post_status = ?, properties = ?"
         " WHERE uid = ?",
-        (props.get("post-status", "published"), json.dumps(props), row["uid"]),
+        (props.get("post-status", "published"), json.dumps(props, default=str), row["uid"]),
     )
     return row["url"]

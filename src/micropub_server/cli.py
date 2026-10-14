@@ -58,6 +58,40 @@ def _migrate(_args) -> int:
     return 0
 
 
+def _import(args) -> int:
+    import asyncio
+
+    from .importer import import_posts
+    from .stores import FileSystemStore
+
+    try:
+        state = _state()
+    except ConfigError as exc:
+        print(f"config error: {exc}", file=sys.stderr)
+        return 1
+    source = FileSystemStore(args.source) if args.source else state.store
+    asyncio.run(state.refresh_site_config())
+    report = asyncio.run(import_posts(state, source, dry_run=args.dry_run, only_type=args.type))
+    verb = "would import" if args.dry_run else "imported"
+    print(
+        f"{verb} {report.imported}, unchanged {report.unchanged}, skipped {report.skipped}, failed {report.failed}"
+    )
+    for name, count in sorted(report.by_type.items()):
+        print(f"  {name}: {count}")
+    for path, url in report.samples:
+        print(f"  e.g. {path} -> {url}")
+    for path, reason in report.problems:
+        print(f"  problem: {path}: {reason}", file=sys.stderr)
+    if args.check_urls and not args.dry_run:
+        from .importer import check_urls
+
+        bad = asyncio.run(check_urls(state))
+        print(f"checked the live site: {len(bad)} imported URLs are not served")
+        for url, status in bad:
+            print(f"  {status or 'error'} {url}", file=sys.stderr)
+    return 0
+
+
 def _serve(_args) -> int:
     import uvicorn
 
@@ -93,6 +127,20 @@ def main(argv: list[str] | None = None) -> int:
         ("migrate", _migrate, "apply database migrations, then exit"),
     ]:
         sub.add_parser(name, help=help_).set_defaults(func=func)
+    imp = sub.add_parser("import", help="load existing posts from the site so they can be edited")
+    imp.add_argument(
+        "--source", help="a local checkout of the site repo (default: read through the store)"
+    )
+    imp.add_argument(
+        "--dry-run", action="store_true", help="report what would be imported, change nothing"
+    )
+    imp.add_argument("--type", help="only this post type, e.g. bookmark")
+    imp.add_argument(
+        "--check-urls",
+        action="store_true",
+        help="afterwards, ask the live site for every imported URL",
+    )
+    imp.set_defaults(func=_import)
     args = parser.parse_args(argv)
     return (args.func if getattr(args, "func", None) else _serve)(args)
 

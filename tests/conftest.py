@@ -37,6 +37,7 @@ CONFIG = {
         },
         "article": {
             "name": "Post",
+            "import_slug": "title",
             "post": {"path": "content/posts/{yyyy}/{slug}/index.md", "url": "posts/{slug}/"},
             "properties": ["name", "content"],
             "required_properties": ["name", "content"],

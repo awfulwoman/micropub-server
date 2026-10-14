@@ -38,6 +38,7 @@ def test_bookmark_keys_match_site_layouts():
             "published": "2026-10-14T19:12:00+02:00",
             "name": "Internet-Week Clock",
             "bookmark-of": "https://www.hackaday.io/project/1",
+            "basedomain": "hackaday.io",
             "content": {"text": "Ridiculous"},
         }
     )
@@ -187,3 +188,33 @@ def test_custom_mapping():
         mapping={"name": "headline", "published": "date"},
     )
     assert "headline" in split(out)[0]
+
+
+def test_photo_extras_such_as_dimensions_survive():
+    fm = split(
+        render(
+            {
+                "published": "2026-10-14T19:12:00+02:00",
+                "photo": [{"url": "pic.jpg", "alt": "A pic", "width": 4608, "height": 2592}],
+            }
+        )
+    )[0]
+    assert fm["images"] == [{"file": "pic.jpg", "alt": "A pic", "width": 4608, "height": 2592}]
+
+
+def test_the_template_never_invents_a_basedomain():
+    out = render(
+        {"published": "2026-10-14T19:12:00+02:00", "bookmark-of": "https://www.theatlantic.com/x"}
+    )
+    assert "basedomain" not in split(out)[0]
+
+
+def test_front_matter_extras_are_written_back_as_found():
+    out = render(
+        {
+            "published": "2026-10-14T19:12:00+02:00",
+            "front-matter": {"basedomain": "www.theatlantic.com", "strapline": "kept"},
+        }
+    )
+    fm = split(out)[0]
+    assert fm["basedomain"] == "www.theatlantic.com" and fm["strapline"] == "kept"

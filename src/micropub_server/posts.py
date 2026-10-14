@@ -115,6 +115,13 @@ def normalise(
         zone = ZoneInfo(tz if tz != "client" else "UTC")
         p["published"] = now.astimezone(zone).isoformat(timespec="seconds")
 
+    if p.get("updated") and tz != "client":
+        p["updated"] = (
+            _parse_date(str(p["updated"]), tz)
+            .astimezone(ZoneInfo(tz))
+            .isoformat(timespec="seconds")
+        )
+
     # name
     if "name" in p:
         name = str(p["name"]).strip()

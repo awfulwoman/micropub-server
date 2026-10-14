@@ -104,6 +104,9 @@ class PostType(_Model):
     discovery: str | None = None
     discovery_first: bool = False
     channel: str | None = None
+    # How the importer derives {slug} for existing files that have no slug in their front matter:
+    # "path" uses the file or folder name; "title" slugifies the title, as Hugo's :slug permalink does.
+    import_slug: Literal["path", "title"] = "path"
     post: Paths
     media: Paths | None = None
     properties: list[str] = Field(default_factory=list)

@@ -25,3 +25,8 @@ def to_list(value: Any) -> list[Any]:
     if value is None:
         return []
     return list(value) if isinstance(value, list) else [value]
+
+
+def base_domain(url: str) -> str:
+    """The host of a URL without a leading www., as the site's bookmark layout shows it."""
+    return (urlsplit(url).hostname or "").removeprefix("www.")

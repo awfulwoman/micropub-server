@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import io
 from typing import Any
-from urllib.parse import urlsplit
 
 from ruamel.yaml import YAML
 from ruamel.yaml.scalarstring import DoubleQuotedScalarString
@@ -13,7 +12,7 @@ from .config import Template
 from .util import to_list
 
 # Keys never written to front matter, whatever the config says.
-_INTERNAL = {"type", "post-type", "post-status", "content"}
+_INTERNAL = {"type", "post-type", "post-status", "content", "front-matter"}
 _DATES = {"date", "lastmod", "expiryDate"}
 _FRONT = ["title", "date", "lastmod", "draft"]
 _TYPE_SPECIFIC = [
@@ -30,11 +29,6 @@ def _yaml() -> YAML:
     y.width = 10_000
     y.indent(mapping=2, sequence=4, offset=2)
     return y
-
-
-def _basedomain(url: str) -> str:
-    host = urlsplit(url).hostname or ""
-    return host.removeprefix("www.")
 
 
 def _num(value: Any) -> Any:
@@ -64,6 +58,9 @@ def _build_front_matter(props: dict[str, Any], tpl: Template) -> dict[str, Any]:
                 {
                     "file": item["url"].rsplit("/", 1)[-1],
                     **({"alt": item["alt"]} if item.get("alt") else {}),
+                    **{
+                        k: v for k, v in item.items() if k not in {"url", "alt"}
+                    },  # width, height ...
                 }
                 for item in to_list(value)
             ]
@@ -79,10 +76,6 @@ def _build_front_matter(props: dict[str, Any], tpl: Template) -> dict[str, Any]:
     if props.get("post-status") == "draft":
         out["draft"] = True
 
-    for link_key in ("bookmark-of",):
-        if props.get(link_key):
-            out["basedomain"] = _basedomain(props[link_key])
-
     card = props.get("checkin")
     if isinstance(card, dict):
         if card.get("name"):
@@ -95,6 +88,11 @@ def _build_front_matter(props: dict[str, Any], tpl: Template) -> dict[str, Any]:
     if isinstance(geo, dict) and geo.get("type") == "geo" and "place_geo" not in out:
         out["place_geo"] = {"lat": _num(geo.get("latitude")), "lng": _num(geo.get("longitude"))}
 
+    # Keys the importer did not understand (slug, strapline, aliases ...) go back exactly as found.
+    extras = props.get("front-matter")
+    if isinstance(extras, dict):
+        for key, value in extras.items():
+            out.setdefault(key, value)
     return _order(out)
 
 
