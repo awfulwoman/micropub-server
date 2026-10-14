@@ -8,6 +8,20 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 CSP = "default-src 'self'; img-src 'self' https: data:; frame-ancestors 'none'; base-uri 'self'"
 
+# Endpoints that browser-based Micropub clients call from other origins. They are authorised by a
+# bearer token in a header, never by a cookie, so letting any origin read them gives nothing away.
+# The cookie-based web UI is deliberately not on this list.
+CORS_PATHS = (
+    "/micropub",
+    "/media",
+    "/syndicate",
+    "/auth/token",
+    "/auth/introspect",
+    "/auth/revoke",
+    "/auth/userinfo",
+    "/.well-known/oauth-authorization-server",
+)
+
 # Pages and endpoints that legitimately carry files.
 UPLOAD_PREFIXES = ("/micropub", "/media", "/files/upload", "/posts/")
 
@@ -32,6 +46,23 @@ class SecurityMiddleware:
         state = scope["app"].state.s
         hsts = state.base.startswith("https://")
         started = False
+        cors = scope["path"] in CORS_PATHS and any(k == b"origin" for k, _ in scope["headers"])
+
+        if cors and scope["method"] == "OPTIONS":
+            await send(
+                {
+                    "type": "http.response.start",
+                    "status": 204,
+                    "headers": [
+                        (b"access-control-allow-origin", b"*"),
+                        (b"access-control-allow-methods", b"GET, POST, OPTIONS"),
+                        (b"access-control-allow-headers", b"Authorization, Content-Type"),
+                        (b"access-control-max-age", b"86400"),
+                    ],
+                }
+            )
+            await send({"type": "http.response.body", "body": b""})
+            return
 
         async def send_with_headers(message: Message) -> None:
             nonlocal started
@@ -50,6 +81,11 @@ class SecurityMiddleware:
                     extra.append((b"content-security-policy", CSP.encode()))
                 if hsts:
                     extra.append((b"strict-transport-security", b"max-age=31536000"))
+                if cors:
+                    extra += [
+                        (b"access-control-allow-origin", b"*"),
+                        (b"access-control-expose-headers", b"Location"),
+                    ]
                 headers.extend((k, v) for k, v in extra if k not in present)
             await send(message)
 
