@@ -145,6 +145,9 @@ def source_list(s: AppState, params: dict[str, Any]) -> dict[str, Any]:
     if params.get("post-type"):
         where.append("post_type = ?")
         args.append(params["post-type"])
+    if params.get("post-status"):
+        where.append("post_status = ?")
+        args.append(params["post-status"])
     if params.get("category"):
         where.append("EXISTS (SELECT 1 FROM json_each(properties, '$.category') WHERE value = ?)")
         args.append(params["category"])

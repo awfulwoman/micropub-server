@@ -208,7 +208,7 @@ Without `url` (the post list extension):
 
 - Newest first, by `published` then `uid`.
 - Filters: `category=<exact tag>`, `filter=<substring>` (matches `name` and
-  `content.text`), `post-type=<type>` (our extension).
+  `content.text`), `post-type=<type>` and `post-status=<draft|published>` (our extensions).
 - `limit` defaults to 40, with a maximum of 100.
 - Cursors are opaque, for example base64 of `published|uid`.
 

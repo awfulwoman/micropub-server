@@ -120,3 +120,12 @@ def test_urlencoded_url_param(client, bearer):
         client.get(f"/micropub?q=source&url={quote(url, safe='')}", headers=bearer).status_code
         == 200
     )
+
+
+def test_source_list_filters_by_status(client, bearer):
+    make(client, bearer, content="live", published="2026-10-13T10:00:00+02:00")
+    make(client, bearer, content="wip", **{"post-status": "draft"})
+    drafts = get(client, bearer, q="source", **{"post-status": "draft"}).json()["items"]
+    assert [it["properties"]["content"][0]["value"] for it in drafts] == ["wip"]
+    live = get(client, bearer, q="source", **{"post-status": "published"}).json()["items"]
+    assert [it["properties"]["content"][0]["value"] for it in live] == ["live"]
