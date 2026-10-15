@@ -29,6 +29,12 @@ Steps:
    - Re-encode in the same format. JPEG quality 85, progressive. Keep PNG
      and WebP as they are. Convert HEIC to JPEG if `pillow-heif` is
      installed.
+   - **GIFs** are re-encoded frame by frame, so the animation, loop count and
+     frame timings stay but the comment and other extensions are dropped.
+     They are not resized.
+   - **Refuse an image with more than 200 million pixels** (`413`), before
+     decoding it. A small file can declare a canvas that takes gigabytes to
+     decode (a decompression bomb).
    - **Never store an image with GPS data.** Test this with a fixture.
 5. **File properties**:
    - `filename`: the slugified basename of the uploaded name plus the sniffed

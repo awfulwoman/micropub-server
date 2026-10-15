@@ -80,11 +80,50 @@ def test_same_input_gives_same_md5():
     assert a.md5 == b.md5
 
 
-def test_gif_passes_through():
+def animated_gif(comment: bytes | None = None) -> bytes:
+    colours = [(255, 0, 0), (0, 255, 0), (0, 0, 255)]  # different frames, or Pillow merges them
+    frames = [Image.new("RGB", (10, 10), c).convert("P") for c in colours]
     buf = io.BytesIO()
-    Image.new("P", (10, 10)).save(buf, "GIF")
-    out = process_upload(buf.getvalue(), "a.gif", Media())
-    assert out.content == buf.getvalue() and out.media_type == "photo"
+    extra = {"comment": comment} if comment else {}
+    frames[0].save(
+        buf, "GIF", save_all=True, append_images=frames[1:], loop=0, duration=80, **extra
+    )
+    return buf.getvalue()
+
+
+def test_gif_keeps_its_animation():
+    out = process_upload(animated_gif(), "a.gif", Media())
+    assert out.media_type == "photo" and out.ext == "gif"
+    im = Image.open(io.BytesIO(out.content))
+    durations = []
+    for i in range(3):
+        im.seek(i)
+        durations.append(im.info["duration"])
+    assert durations == [80, 80, 80]
+    assert im.n_frames == 3 and im.info.get("loop") == 0
+
+
+def test_gif_comments_are_stripped():
+    data = animated_gif(comment=b"SecretComment")
+    assert b"SecretComment" in data
+    assert b"SecretComment" not in process_upload(data, "a.gif", Media()).content
+
+
+def test_image_with_too_many_pixels_is_refused_before_it_is_decoded():
+    # A tiny file that claims a huge canvas: the classic decompression bomb.
+    buf = io.BytesIO()
+    Image.new("1", (20_000, 20_000)).save(buf, "PNG")  # ~400 MP, compresses to a few KB
+    assert len(buf.getvalue()) < 1_000_000
+    with pytest.raises(MediaError) as exc:
+        process_upload(buf.getvalue(), "bomb.png", Media())
+    assert exc.value.status == 413 and "pixels" in str(exc.value)
+
+
+def test_a_large_but_sane_photo_is_still_accepted():
+    buf = io.BytesIO()
+    Image.new("RGB", (6000, 4000), (10, 20, 30)).save(buf, "JPEG")  # 24 MP
+    out = process_upload(buf.getvalue(), "big.jpg", Media())
+    assert Image.open(io.BytesIO(out.content)).size == (2560, 1707)
 
 
 @pytest.mark.parametrize(

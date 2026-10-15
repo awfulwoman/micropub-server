@@ -8,7 +8,7 @@ import posixpath
 from dataclasses import dataclass
 
 import filetype
-from PIL import Image, ImageOps, UnidentifiedImageError
+from PIL import Image, ImageOps, ImageSequence, UnidentifiedImageError
 from slugify import slugify
 
 from .config import Media
@@ -19,7 +19,10 @@ _IMAGE_FORMATS = {
     "image/png": ("PNG", "png"),
     "image/webp": ("WEBP", "webp"),
 }
-_PASSTHROUGH_IMAGES = {"image/gif"}
+# Refuse images that claim more pixels than this, before decoding them: a small file can
+# declare a canvas that takes gigabytes to decode (a decompression bomb). Real photos from
+# the biggest phone sensors are about 200 MP.
+MAX_PIXELS = 200_000_000
 _MEDIA_TYPES = {"image": "photo", "video": "video", "audio": "audio"}
 
 
@@ -39,12 +42,38 @@ class Processed:
     md5: str
 
 
-def _clean_image(data: bytes, mime: str, media: Media) -> bytes:
+def _open_image(data: bytes) -> Image.Image:
+    """Open and fully decode an image, refusing one with too many pixels before decoding."""
     try:
-        im = Image.open(io.BytesIO(data))
+        im = Image.open(io.BytesIO(data))  # reads the header only
+        if im.width * im.height > MAX_PIXELS:
+            raise MediaError(f"The image has more than {MAX_PIXELS:,} pixels", 413)
         im.load()
+    except Image.DecompressionBombError as exc:
+        raise MediaError(f"The image has more than {MAX_PIXELS:,} pixels", 413) from exc
     except (UnidentifiedImageError, OSError, SyntaxError) as exc:
         raise MediaError("The image could not be read", 400) from exc
+    return im
+
+
+def _clean_gif(data: bytes) -> bytes:
+    """Re-encode a GIF so its comment and other extensions are dropped, keeping the animation."""
+    im = _open_image(data)
+    frames, durations = [], []
+    for frame in ImageSequence.Iterator(im):
+        frames.append(frame.copy())
+        durations.append(frame.info.get("duration", 100))
+    out = io.BytesIO()
+    options = {"duration": durations}
+    if "loop" in im.info:
+        options["loop"] = im.info["loop"]
+    # An empty comment stops Pillow carrying the original one over.
+    frames[0].save(out, "GIF", save_all=True, append_images=frames[1:], comment=b"", **options)
+    return out.getvalue()
+
+
+def _clean_image(data: bytes, mime: str, media: Media) -> bytes:
+    im = _open_image(data)
     pil_format, _ = _IMAGE_FORMATS[mime]
     im = ImageOps.exif_transpose(im)  # apply the camera's rotation before it is discarded
     im.thumbnail((media.image.max_width, media.image.max_height), Image.Resampling.LANCZOS)
@@ -79,7 +108,9 @@ def process_upload(data: bytes, original_name: str, media: Media) -> Processed:
         if kind.mime in _IMAGE_FORMATS:
             content = _clean_image(data, kind.mime, media)
             ext = _IMAGE_FORMATS[kind.mime][1]
-        elif kind.mime not in _PASSTHROUGH_IMAGES:
+        elif kind.mime == "image/gif":
+            content = _clean_gif(data)
+        else:
             raise MediaError(f"{kind.mime} images are not supported", 415)
 
     stem = slugify(posixpath.splitext(posixpath.basename(original_name))[0]) or "file"
