@@ -106,6 +106,7 @@ def create_app(state: AppState) -> Starlette:
         routes_system,
         routes_ui,
         routes_ui_extra,
+        routes_webhook,
     )
     from .logs import AccessLogMiddleware
     from .security import SecurityMiddleware
@@ -117,6 +118,7 @@ def create_app(state: AppState) -> Starlette:
         *routes_media.routes(),
         *routes_ui.routes(),
         *routes_ui_extra.routes(),
+        *routes_webhook.routes(),
     ]
     app = Starlette(
         routes=routes,

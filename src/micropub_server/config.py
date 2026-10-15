@@ -40,6 +40,7 @@ class Application(_Model):
     # Largest request body, for the pages and endpoints that take uploads, and for everything else.
     max_body_bytes: int = 26_214_400
     max_form_bytes: int = 65_536
+    max_webhook_bytes: int = 1_048_576
 
     @field_validator("time_zone")
     @classmethod
@@ -143,6 +144,13 @@ class Syndication(_Model):
     require_live: bool = True
 
 
+class Deploy(_Model):
+    """Which GitHub workflow run means "the site is live" (spec 08). Needs WEBHOOK_SECRET."""
+
+    # The workflow's name. Unset: a successful run of any workflow on the store's branch counts.
+    workflow: str | None = None
+
+
 class SiteOverlay(_Model):
     """The site-owned file (data/micropub.yaml): the shape of its own content (spec 06)."""
 
@@ -162,6 +170,7 @@ class Config(_Model):
     post_types: dict[str, PostType] = Field(default_factory=dict)
     channels: dict[str, Channel] = Field(default_factory=dict)
     syndication: Syndication = Field(default_factory=Syndication)
+    deploy: Deploy = Field(default_factory=Deploy)
     site_config_path: str | None = None
 
 

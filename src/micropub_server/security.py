@@ -37,6 +37,8 @@ class SecurityMiddleware:
     def _limit(self, scope: Scope) -> int:
         config = scope["app"].state.s.config.application
         path = scope["path"]
+        if path.startswith("/webhooks/"):
+            return config.max_webhook_bytes
         return config.max_body_bytes if path.startswith(UPLOAD_PREFIXES) else config.max_form_bytes
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:

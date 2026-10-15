@@ -16,6 +16,7 @@ from starlette.staticfiles import StaticFiles
 
 from . import ui
 from .auth.passwords import verify_password
+from .deploys import build_label
 from .forms import LABELS, LINKS, PHOTO_SLOTS, build_post, type_fields, type_required
 from .http import state_of
 from .jf2 import jf2_to_mf2
@@ -157,6 +158,7 @@ def list_posts(s, filters: dict[str, str], after: str | None, before: str | None
                 "deleted": bool(r["deleted"]),
                 "waiting": bool(r["waiting"]),
                 "imported": r["source"] == "import",
+                "build": build_label(s, r["uid"]),
             }
         )
     has_after = more if not backwards else bool(cursor)
@@ -374,6 +376,7 @@ async def post_page(request: Request, session: dict[str, Any]) -> Response:
         copies=copies,
         notice=notice,
         waiting=bool(props.get("mp-syndicate-to")) and not deleted and bool(s.targets),
+        build=build_label(s, row["uid"]),
         file_text=render_post(props, s.template) if not deleted else "",
     )
 

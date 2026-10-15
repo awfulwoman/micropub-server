@@ -88,7 +88,7 @@ class GitHubStore:
             e["path"] for e in data["tree"] if e["type"] == "blob" and e["path"].startswith(wanted)
         )
 
-    async def commit(self, changes: list[Change], message: str) -> None:
+    async def commit(self, changes: list[Change], message: str) -> str | None:
         entries: list[tuple[str, bytes | None]] = []  # (path, content or None for delete)
         for change in changes:
             if isinstance(change, Put):
@@ -105,14 +105,15 @@ class GitHubStore:
                 entries.append((change.new_path, content))
 
         for attempt in range(3):
-            response = await self._try_commit(entries, message)
-            if response is None:
-                return
-            if response.status_code != 422 or attempt == 2:
-                raise self._fail("update the branch", response)
+            sha, failure = await self._try_commit(entries, message)
+            if failure is None:
+                return sha
+            if failure.status_code != 422 or attempt == 2:
+                raise self._fail("update the branch", failure)
+        return None
 
-    async def _try_commit(self, entries, message: str) -> httpx.Response | None:
-        """Return None on success, or the failing ref-update response (for a retry)."""
+    async def _try_commit(self, entries, message: str) -> tuple[str | None, httpx.Response | None]:
+        """Return (commit id, None) on success, or (None, the failing ref-update response)."""
         ref = await self._request("GET", f"/git/ref/heads/{self.branch}")
         if ref.status_code != 200:
             raise self._fail(f"read branch {self.branch}", ref)
@@ -156,7 +157,9 @@ class GitHubStore:
             f"/git/refs/heads/{self.branch}",
             json={"sha": commit.json()["sha"], "force": False},
         )
-        return None if update.status_code == 200 else update
+        if update.status_code == 200:
+            return commit.json()["sha"], None
+        return None, update
 
     async def check(self) -> str | None:
         try:

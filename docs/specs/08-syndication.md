@@ -56,8 +56,7 @@ Indiekit expects a webhook after deploy. For us:
   `curl -X POST https://indie.awfulwoman.com/syndicate -H "Authorization: Bearer $SYNDICATE_TOKEN"`.
 - That token is an access token with only the `update` scope, kept as a repo
   secret.
-- Also accept a JWT `HS256` webhook signed with `WEBHOOK_SECRET`, in the
-  `x-webhook-signature` header, as Indiekit does for Netlify. Optional.
+- Better: the GitHub webhook below, which needs no token and knows exactly when the build ended.
 
 Before syndicating, check the post's public URL returns `200` (it is live).
 If not, skip it and leave `mp-syndicate-to` for the next trigger.
@@ -103,7 +102,32 @@ Settings: `handle`, `password` (app password, env `BLUESKY_PASSWORD`),
 
 The returned URL is `https://bsky.app/profile/{handle}/post/{rkey}`.
 
-### As built
+### Knowing when the site is live: the GitHub webhook
+
+Every commit the server makes for a post returns a commit id (the Git Data API gives it back).
+It is stored in `deploys` (`sha`, `post_uid`, `action`, `state`, `run_url`), state `pending`.
+GitHub's `workflow_run` webhook carries the `head_sha` of the commit that started a run, so the
+run is matched to the post by that id and nothing is added to the post or its front matter.
+
+`POST /webhooks/github` (404 unless `WEBHOOK_SECRET` is set; body up to `max_webhook_bytes`, 1 MB):
+
+- Verify `X-Hub-Signature-256` (HMAC-SHA256 of the raw body). A bad signature is `401`.
+- `ping` is `200`. Any event other than `workflow_run` is `202` and ignored.
+- Only `action: completed` counts, for the configured repository, the store's branch and
+  `deploy.workflow` (a workflow name; unset means any workflow).
+- `conclusion: success`: the commit and every earlier `pending` or `failed` commit become `live`
+  (a newer push cancels an older run, and the newer build contains the older change). Then every
+  waiting post is shared, in the background, so the webhook answers within GitHub's 10 seconds.
+  A success for a commit the server did not make still triggers sharing.
+- `failure`, `timed_out`, `startup_failure`: that commit becomes `failed` if still `pending`,
+  keeping the run's URL. A later success still turns it `live`.
+- `cancelled`, `skipped` and runs still in progress change nothing.
+
+The UI shows the latest build state on the post page (with a link to the run) and flags posts
+that are building or failed in the list. Imported posts and posts made through a directory store
+have no commit id, so they show nothing. `POST /syndicate` still works as a manual trigger.
+
+## As built
 
 - A link in the text becomes a link facet and each hashtag a tag facet. The limit is 300
   characters with URLs counted in full (Bluesky does not shorten them).
@@ -124,8 +148,7 @@ dropped from the queue without a copy, rather than failing forever.
 
 ## As built
 
-- `POST /syndicate` needs a bearer token with the `update` scope (the optional signed webhook
-  is not built). `?source_url=` (or `{"syndication": {"source_url": ...}}`) names a post.
+- `POST /syndicate` needs a bearer token with the `update` scope. `?source_url=` (or `{"syndication": {"source_url": ...}}`) names a post.
 - `syndication.require_live` (default true) fetches the post's public URL first and leaves the
   post queued if it is not served yet.
 - The copy is recorded through the same path as an update, so it is one commit.

@@ -28,6 +28,7 @@
       {% if p.deleted %}<span class="badge deleted">deleted</span>{% endif %}
       {% if p.status == 'draft' %}<span class="badge draft">draft</span>{% endif %}
       {% if p.waiting %}<span class="badge">waiting to share</span>{% endif %}
+      {% if p.build and p.build.state != 'live' %}<span class="badge {{ 'danger' if p.build.state == 'failed' }}">{{ p.build.text }}</span>{% endif %}
       {% if p.imported %}<span class="badge">imported</span>{% endif %}
       {% if not p.deleted %}<a href="{{ p.url }}">live</a>{% endif %}
     </div>

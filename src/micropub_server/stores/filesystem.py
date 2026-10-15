@@ -43,7 +43,7 @@ class FileSystemStore:
             return []
         return sorted(p.relative_to(self.root).as_posix() for p in base.rglob("*") if p.is_file())
 
-    async def commit(self, changes: list[Change], message: str) -> None:
+    async def commit(self, changes: list[Change], message: str) -> str | None:
         for change in changes:
             if isinstance(change, Put):
                 self._write(change.path, change.content)
@@ -57,6 +57,8 @@ class FileSystemStore:
                 )
                 self._write(change.new_path, content)
                 self._delete(change.old_path)
+
+        return None
 
     def _write(self, path: str, content: bytes) -> None:
         target = self._path(path)

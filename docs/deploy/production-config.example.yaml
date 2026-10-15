@@ -27,6 +27,11 @@ channels:
 # post_types here if you want a fallback.
 site_config_path: data/micropub.yaml
 
+# Which GitHub workflow run means "the site is live". Needs WEBHOOK_SECRET and a webhook on the
+# site repo (docs/deploy/README.md, step 2.6).
+deploy:
+  workflow: Build site and push to server
+
 syndication:
   require_live: true
   mastodon:

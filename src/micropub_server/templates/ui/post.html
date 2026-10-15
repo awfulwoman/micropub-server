@@ -7,6 +7,7 @@
   {{ type_label }} &middot; <time datetime="{{ row.published }}">{{ row.published }}</time>
   {% if deleted %}<span class="badge deleted">deleted</span>{% endif %}
   {% if row.post_status == 'draft' %}<span class="badge draft">draft</span>{% endif %}
+  {% if build %}<span class="badge {{ 'danger' if build.state == 'failed' }}">{% if build.run_url %}<a href="{{ build.run_url }}">{{ build.text }}</a>{% else %}{{ build.text }}{% endif %}</span>{% endif %}
 </p>
 {% if not deleted %}<p><a href="{{ row.url }}">{{ row.url }}</a></p>{% endif %}
 <div class="actions">

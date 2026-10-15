@@ -13,6 +13,7 @@ from zoneinfo import ZoneInfo
 from uuid_utils import uuid7
 
 from .app import AppState
+from .deploys import record as record_deploy
 from .media import Processed
 from .posts import discover_post_type, normalise, render_template
 from .stores import Delete, Move, Put, StoreError
@@ -244,7 +245,7 @@ async def create_post(
         action="create", post_type=post_type, file_type="post"
     )
     try:
-        await s.store.commit([Put(path, content.encode()), *media_changes], message)
+        sha = await s.store.commit([Put(path, content.encode()), *media_changes], message)
     except StoreError as exc:
         raise MicropubError("store_error", str(exc), 502) from exc
 
@@ -264,6 +265,7 @@ async def create_post(
                 json.dumps(props, default=str),
             ),
         )
+        record_deploy(s, sha, uid, "create")
         for action in media_actions:
             if action[0] == "insert":
                 record_media(s, action[1], action[2])
@@ -297,9 +299,9 @@ def _message(s: AppState, action: str, post_type: str) -> str:
     )
 
 
-async def _commit(s: AppState, changes: list, message: str) -> None:
+async def _commit(s: AppState, changes: list, message: str) -> str | None:
     try:
-        await s.store.commit(changes, message)
+        return await s.store.commit(changes, message)
     except StoreError as exc:
         raise MicropubError("store_error", str(exc), 502) from exc
 
@@ -411,7 +413,7 @@ async def update_post(
             name = posixpath.basename(m["path"])
             changes.append(Move(m["path"], f"{new_dir}/{name}"))
             media_rows.append((f"{new_dir}/{name}", new_url + name, m["uid"]))
-    await _commit(s, changes, _message(s, "update", post_type))
+    sha = await _commit(s, changes, _message(s, "update", post_type))
 
     with s.db.transaction():
         s.db.execute(
@@ -432,6 +434,7 @@ async def update_post(
             s.db.execute(
                 "UPDATE media SET path = ?, url = ? WHERE uid = ?", (path, media_url, media_uid)
             )
+        record_deploy(s, sha, row["uid"], "update")
     return Updated(url=new_url, changed=True, moved=moved or new_url != old_url)
 
 
@@ -441,7 +444,8 @@ async def delete_post(s: AppState, url: str) -> str:
         return row["url"]  # already gone: nothing to do
     props = json.loads(row["properties"])
     if await s.store.exists(row["path"]):
-        await _commit(s, [Delete(row["path"])], _message(s, "delete", row["post_type"]))
+        sha = await _commit(s, [Delete(row["path"])], _message(s, "delete", row["post_type"]))
+        record_deploy(s, sha, row["uid"], "delete")
     kept = {
         k: props[k] for k in ("post-type", "published", "slug", "type", "uid", "url") if k in props
     }
@@ -461,7 +465,8 @@ async def undelete_post(s: AppState, url: str, *, draft_mode: bool = False) -> s
     if draft_mode:
         props["post-status"] = "draft"
     content = render_post(props, s.template).encode()
-    await _commit(s, [Put(row["path"], content)], _message(s, "undelete", row["post_type"]))
+    sha = await _commit(s, [Put(row["path"], content)], _message(s, "undelete", row["post_type"]))
+    record_deploy(s, sha, row["uid"], "undelete")
     s.db.execute(
         "UPDATE posts SET deleted = NULL, deleted_properties = NULL, post_status = ?, properties = ?"
         " WHERE uid = ?",

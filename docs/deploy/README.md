@@ -67,7 +67,13 @@ Commit these without any Claude or co-author trailers (that repo's rule).
 
    Without this step posts are shared the next time anyone calls `/syndicate` or presses
    "Share now".
-6. **Photos** are stripped of location by the server. The pre-commit hook `exif.sh` does not run for
+6. **Tell the server when a build finishes** (replaces step 5's curl, which can stay as a backup):
+   in the site repo's Settings, Webhooks, add one with payload URL
+   `https://indie.awfulwoman.com/webhooks/github`, content type `application/json`, the secret that
+   is `WEBHOOK_SECRET` on the server, and only the **Workflow runs** event. GitHub sends a `ping`
+   straight away: it should show a green tick (a 404 means `WEBHOOK_SECRET` is not set). From then
+   on the post page shows building, live or build failed, and sharing starts when the build ends.
+7. **Photos** are stripped of location by the server. The pre-commit hook `exif.sh` does not run for
    commits made through the API, so consider a CI check that fails the build if any image under
    `content/` still has GPS data.
 

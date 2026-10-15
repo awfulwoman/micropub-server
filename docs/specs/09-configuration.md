@@ -26,7 +26,7 @@ the process with a clear message. Also warn about unknown path tokens
 | `GITHUB_TOKEN` | if GitHub store | | Fine-grained PAT, Contents read and write |
 | `MASTODON_ACCESS_TOKEN` | if Mastodon | | |
 | `BLUESKY_PASSWORD` | if Bluesky | | App password |
-| `WEBHOOK_SECRET` | | | Optional signed webhook for `/syndicate` |
+| `WEBHOOK_SECRET` | | | Enables `POST /webhooks/github` (spec 08). The same secret goes in the GitHub webhook |
 | `PORT` | | `8000` | Listen port |
 | `LOG_LEVEL` | | `info` | |
 | `TZ` | | `UTC` | Process time zone. Posts use `publication.time_zone`. |
@@ -157,6 +157,9 @@ post_types:
 channels:                          # keyed by uid. The first is the default.
   main: {name: Main}
   bandnames: {name: Band names}
+
+deploy:
+  workflow: Build site and push to server   # the run that means "the site is live"
 
 syndication:
   require_live: true            # fetch the post's public URL first; leave it queued if not served yet
