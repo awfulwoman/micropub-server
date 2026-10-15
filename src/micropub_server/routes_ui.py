@@ -329,6 +329,15 @@ async def new_submit(request: Request, session: dict[str, Any]) -> Response:
 
 
 # --- one post ---------------------------------------------------------------------------------------------
+def _clean_preview(html: str, base: str) -> str:
+    """Sanitised post HTML, with relative image links made absolute against the post's own URL."""
+
+    def absolute(tag: str, attr: str, value: str) -> str:
+        return urljoin(base, value) if (tag, attr) == ("img", "src") else value
+
+    return nh3.clean(html, attribute_filter=absolute)
+
+
 @signed_in
 async def post_page(request: Request, session: dict[str, Any]) -> Response:
     s = state_of(request)
@@ -370,7 +379,7 @@ async def post_page(request: Request, session: dict[str, Any]) -> Response:
         title=_title(props, props.get("slug") or row["url"]),
         type_label=cfg.name if cfg else row["post_type"],
         deleted=deleted,
-        preview_html=nh3.clean(html) if html else "",
+        preview_html=_clean_preview(html, row["url"]) if html else "",
         photos=photos,
         details=details,
         copies=copies,

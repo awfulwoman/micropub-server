@@ -393,3 +393,9 @@ def test_build_endpoint_reports_state_as_json(ui, state):
 
 def test_build_endpoint_needs_a_session(client):
     assert client.get("/posts/x/build", follow_redirects=False).status_code in {303, 401}
+
+
+def test_post_page_images_point_at_the_site_not_the_editor(ui):
+    r = create(ui, "note", {"content": "![a cat](files/cat.jpg)"})
+    html = ui.get(r.headers["location"]).text
+    assert re.search(r'<img src="https?://[^"]+/files/cat\.jpg"', html)
