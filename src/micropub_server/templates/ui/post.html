@@ -41,3 +41,4 @@
 <p class="muted"><code>{{ row.path }}</code></p>
 {% if file_text %}<pre>{{ file_text }}</pre>{% endif %}
 {% endblock %}
+{% block scripts %}{% if build and build.state == 'pending' %}<script src="/static/app.js" defer></script>{% endif %}{% endblock %}

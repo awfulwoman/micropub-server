@@ -384,7 +384,8 @@ def test_build_endpoint_reports_state_as_json(ui, state):
     )
     r = ui.get(f"/posts/{uid}/build")
     assert r.json()["state"] == "pending" and r.headers["cache-control"] == "no-store"
-    assert f'data-poll="/posts/{uid}/build"' in ui.get(f"/posts/{uid}").text
+    page = ui.get(f"/posts/{uid}").text
+    assert f'data-poll="/posts/{uid}/build"' in page and "/static/app.js" in page
     state.db.execute("UPDATE deploys SET state = 'live' WHERE sha = 'abc'")
     assert ui.get(f"/posts/{uid}/build").json()["state"] == "live"
     assert "data-poll" not in ui.get(f"/posts/{uid}").text
