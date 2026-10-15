@@ -19,6 +19,18 @@ MAX_LIMIT = 100
 
 
 async def get_categories(s: AppState) -> list[str]:
+    """Tags to suggest: the configured list or URL, then every tag already used, commonest first."""
+    configured = await _configured_categories(s)
+    seen = {t.lower() for t in configured}
+    rows = s.db.query(
+        "SELECT j.value AS tag, count(*) AS n FROM posts, json_each(posts.properties, '$.category') j"
+        " WHERE posts.deleted IS NULL AND j.type = 'text' GROUP BY lower(j.value) ORDER BY n DESC, tag"
+    )
+    used = [r["tag"] for r in rows if r["tag"].lower() not in seen]
+    return [*configured, *used]
+
+
+async def _configured_categories(s: AppState) -> list[str]:
     source = s.config.publication.categories
     if isinstance(source, list):
         return source

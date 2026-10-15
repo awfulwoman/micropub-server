@@ -27,7 +27,7 @@
       <input id="f-summary" type="text" name="summary" value="{{ val('summary') }}">
     {% elif f == 'category' %}
       <label for="f-category">{{ labels.category }} <span class="hint">separate with commas</span></label>
-      <input id="f-category" type="text" name="category" value="{{ val('category') }}" list="known-tags" autocomplete="off">
+      <input id="f-category" type="text" name="category" value="{{ val('category') }}" list="known-tags" autocomplete="off" data-tags>
       <datalist id="known-tags">{% for t in tags %}<option value="{{ t }}">{% endfor %}</datalist>
     {% elif f == 'photo' and not editing %}
       <fieldset>

@@ -189,3 +189,14 @@ forms. Cached in the `cache` table.
   reply, repost), edit, delete and undelete.
 - **5c:** `/share` and the bookmarklet, the Web Share Target, `/files`,
   `/tokens`, `/status`.
+
+## Progressive enhancement
+
+Every page works without JavaScript. `static/app.js` adds:
+
+- **Tag suggestions.** Without JS the tag field uses a browser datalist. With JS it suggests for the
+  tag being typed (after the last comma), skips tags already entered, and supports arrow keys,
+  Enter and Escape. Suggestions are the configured `publication.categories` plus every tag already
+  used on a live post, commonest first.
+- **Build badge.** While a post's build is pending, the post page polls `GET /posts/{uid}/build`
+  (JSON, session only) every 5 seconds and updates the badge when it is live or failed.

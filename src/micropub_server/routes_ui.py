@@ -10,7 +10,7 @@ from zoneinfo import ZoneInfo
 
 import nh3
 from starlette.requests import Request
-from starlette.responses import RedirectResponse, Response
+from starlette.responses import JSONResponse, RedirectResponse, Response
 from starlette.routing import Mount, Route
 from starlette.staticfiles import StaticFiles
 
@@ -381,6 +381,13 @@ async def post_page(request: Request, session: dict[str, Any]) -> Response:
     )
 
 
+@signed_in
+async def post_build(request: Request, session: dict[str, Any]) -> Response:
+    """The post's build state as JSON, so the page can update the badge while a build runs."""
+    label = build_label(state_of(request), request.path_params["uid"])
+    return JSONResponse(label or {}, headers={"Cache-Control": "no-store"})
+
+
 # --- editing ------------------------------------------------------------------------------------------------
 def _local_time(s, iso: str) -> str:
     dt = datetime.fromisoformat(iso)
@@ -666,6 +673,7 @@ def routes() -> list:
         Route("/posts/new/{type}", new_form, methods=["GET"]),
         Route("/posts/new/{type}", new_submit, methods=["POST"]),
         Route("/posts/{uid}", post_page),
+        Route("/posts/{uid}/build", post_build),
         Route("/posts/{uid}/edit", edit_form, methods=["GET"]),
         Route("/posts/{uid}/edit", edit_submit, methods=["POST"]),
         Route("/posts/{uid}/delete", delete_form, methods=["GET"]),

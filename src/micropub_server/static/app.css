@@ -78,3 +78,7 @@ dl.props dd { margin: 0; overflow-wrap: anywhere; }
 table { border-collapse: collapse; width: 100%; }
 th, td { text-align: left; padding: .4rem .5rem; border-bottom: 1px solid var(--line); vertical-align: top; }
 .skip { position: absolute; left: -999px; } .skip:focus { left: 1rem; top: 1rem; background: var(--bg); padding: .5rem; }
+
+.suggestions { list-style: none; margin: .15rem 0 0; padding: 0; border: 1px solid var(--line); border-radius: 4px; background: var(--bg, Canvas); max-width: 24rem; }
+.suggestions li { padding: .3rem .6rem; cursor: pointer; }
+.suggestions li[aria-selected="true"], .suggestions li:hover { background: var(--line); }

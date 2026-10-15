@@ -362,3 +362,33 @@ def test_list_keeps_filters_when_paging(ui, monkeypatch):
 
 def test_bad_paging_cursor_is_400(ui):
     assert ui.get("/posts?after=garbage").status_code == 400
+
+
+# --- progressive enhancement ---------------------------------------------------------------
+def _uid(response):
+    return re.search(r"/posts/([^/?]+)", response.headers["location"]).group(1)
+
+
+def test_tag_suggestions_come_from_tags_already_used(ui):
+    create(ui, "note", {"content": "one", "category": "zfs, indieweb"})
+    create(ui, "note", {"content": "two", "category": "zfs"})
+    html = ui.get("/posts/new/note").text
+    assert html.index('value="zfs"') < html.index('value="indieweb"')
+    assert "data-tags" in html
+
+
+def test_build_endpoint_reports_state_as_json(ui, state):
+    uid = _uid(create(ui, "note", {"content": "built"}))
+    state.db.execute(
+        "INSERT INTO deploys (sha, post_uid, action) VALUES ('abc', ?, 'create')", (uid,)
+    )
+    r = ui.get(f"/posts/{uid}/build")
+    assert r.json()["state"] == "pending" and r.headers["cache-control"] == "no-store"
+    assert f'data-poll="/posts/{uid}/build"' in ui.get(f"/posts/{uid}").text
+    state.db.execute("UPDATE deploys SET state = 'live' WHERE sha = 'abc'")
+    assert ui.get(f"/posts/{uid}/build").json()["state"] == "live"
+    assert "data-poll" not in ui.get(f"/posts/{uid}").text
+
+
+def test_build_endpoint_needs_a_session(client):
+    assert client.get("/posts/x/build", follow_redirects=False).status_code in {303, 401}
