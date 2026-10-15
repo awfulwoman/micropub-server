@@ -129,6 +129,7 @@ def _serve(_args) -> int:
         forwarded_allow_ips="*",
         log_config=None,
         access_log=False,
+        server_header=False,
     )
     return 0
 
