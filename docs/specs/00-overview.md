@@ -112,7 +112,7 @@ that are not).
    `q=config`. GitHub store. Hugo template for notes. Dockerfile,
    `compose.yaml` for local runs, and the GHCR workflow with smoke test.
 2. **All post types.** Article, bookmark, like, reply, repost, photo,
-   checkin, quote, bandname. Media endpoint with EXIF stripping. `q=source`, `q=category`,
+   checkin, quote, page. Media endpoint with EXIF stripping. `q=source`, `q=category`,
    `q=syndicate-to`, `q=post-types`.
 3. **Editing and import.** Update (replace, add, delete), delete, undelete.
    Draft scope. `import` command for existing posts.
@@ -128,5 +128,5 @@ that are not).
   [05](05-post-model.md#post-type-discovery)).
 - **Import:** build `micropub-server import`, so `q=source` and updates work
   on posts the server did not create ([10](10-data-model.md#import-command)).
-- **In scope:** checkins, quotes and bandnames are all supported post types
+- **In scope:** checkins, quotes and pages are all supported post types
   ([06](06-post-templates.md)). Guinea pig profiles stay out of scope.

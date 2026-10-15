@@ -217,11 +217,11 @@ def test_type_change_moves_the_post(client, full, site):
 
 
 def test_channel_survives_an_update(client, full, site, state):
-    make(client, full, name="Wife Biscuits", **{"mp-channel": "bandnames"})
+    make(client, full, name="Uses", content="Kit", **{"mp-channel": "pages"})
     url = state.db.query("SELECT url FROM posts")[0][0]
     update(client, full, url, add={"category": ["funny"]})
     props = json.loads(state.db.query("SELECT properties FROM posts")[0][0])
-    assert props["channel"] == ["bandnames"] and props["post-type"] == "bandname"
+    assert props["channel"] == ["pages"] and props["post-type"] == "page"
 
 
 def test_uid_cannot_be_changed(client, full, state):

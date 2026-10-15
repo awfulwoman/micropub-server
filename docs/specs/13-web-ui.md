@@ -93,7 +93,7 @@ Each form is built from the type's `properties` list in the config
 
 | Property | Widget |
 | --- | --- |
-| `name` | text input. For a bandname this is the only field. |
+| `name` | text input. A page needs it, and so does its slug. |
 | `content` | textarea for Markdown, with an optional live preview |
 | `summary` | short textarea |
 | `category` | text input, comma-separated, with tag autocomplete |
@@ -184,7 +184,7 @@ forms. Cached in the `cache` table.
 ## Phase plan
 
 - **5a:** login, the posts list, `/posts/new` with forms for note, article,
-  bookmark and bandname, the post page.
+  bookmark and page, the post page.
 - **5b:** the remaining forms (photo with upload, checkin, quote, like,
   reply, repost), edit, delete and undelete.
 - **5c:** `/share` and the bookmarklet, the Web Share Target, `/files`,

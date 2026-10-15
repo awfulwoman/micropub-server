@@ -247,7 +247,17 @@ async def import_posts(
         name = posixpath.basename(path)
         if not name.endswith(".md") or name == "_index.md":
             continue
-        type_name = next((t for p, t in prefixes if path.startswith(p)), None)
+        type_name = next(
+            (
+                t
+                for p, t in prefixes
+                if path.startswith(p)
+                # A type rooted at the content directory itself (pages) only claims files there, not
+                # everything below it that no other type wants.
+                and (p != f"{root}/" or _template_regex(s.post_types[t].post.path).match(path))
+            ),
+            None,
+        )
         if type_name is None or (only_type and type_name != only_type):
             if not only_type or type_name is None:
                 report.skipped += 1
@@ -277,7 +287,10 @@ async def import_posts(
             attachments = await _attachments(source, by_dir, path, url, props["published"])
             outcome = _store(s, path, type_name, props, attachments, dry_run)
         except _Skip as exc:
-            report.fail(path, str(exc))
+            if _prefix(cfg) == f"{root}/":
+                report.skipped += 1  # an undated page (about, contact) is not a post
+            else:
+                report.fail(path, str(exc))
             continue
         except (ValueError, UnicodeDecodeError, KeyError) as exc:
             report.fail(

@@ -56,7 +56,7 @@ bugs upstream.
 - Configured discovery properties (`bookmark-of`) are checked **after** the
   built-in ones, so a bookmark with a photo is a photo. Decided 2026-10-14.
   Our `discovery_first` and channel binding add exceptions for checkins and
-  bandnames.
+  pages.
 - `202 Accepted` on create, since the site still has to build.
 - Optional PKCE, for older clients.
 - Matching syndication targets by origin.

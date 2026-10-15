@@ -126,7 +126,7 @@ directory structure, because `hugo.yaml` only sets a permalink for `posts`.
 | quote | `content/quotes/{yyyy}/{MM}/{dd}/{HH}{mm}.md` | `quotes/{yyyy}/{MM}/{dd}/{HH}{mm}/` | no |
 | photo | `content/photos/{yyyy}/{MM}/{dd}/{HH}{mm}/index.md` | `photos/{yyyy}/{MM}/{dd}/{HH}{mm}/` | yes |
 | checkin | `content/checkins/{yyyy}/{MM}/{dd}/{HH}{mm}/index.md` | `checkins/{yyyy}/{MM}/{dd}/{HH}{mm}/` | yes (photos from Swarm) |
-| bandname | `content/bandnames/{yyyy}/{MM}/{slug}.md` | `bandnames/{yyyy}/{MM}/{slug}/` | no |
+| page | `content/{slug}.md` | `{slug}/` | no |
 
 Two posts of the same type in the same minute get `-2` from the collision
 rule in [03](03-micropub.md#create).
@@ -137,19 +137,23 @@ rule in [03](03-micropub.md#create).
 | --- | --- | --- |
 | quote | `quotation-of=<url>` plus `content` (the quoted text). Optional `author` h-card. | `discovery: quotation-of` |
 | checkin | `checkin` = h-card (`name`, `latitude`, `longitude`, `url`), as OwnYourSwarm sends | `discovery: checkin`, `discovery_first: true` |
-| bandname | `name` only, with `mp-channel=bandnames`. The web UI's band name form sets this ([13](13-web-ui.md)). | channel binding (step 0 in [05](05-post-model.md#post-type-discovery)) |
+| page | `name` and `content`, with `mp-channel=pages`. The web UI's page form sets this ([13](13-web-ui.md)). | channel binding (step 0 in [05](05-post-model.md#post-type-discovery)) |
 
-A bandname file has front matter only, with no body, matching
-`content/bandnames/2024/11/wifebiscuits.md`:
+A page sits at the site root, so `content/uses.md` is served at `/uses/`:
 
 ```markdown
 ---
-title: Wife Biscuits
+title: Uses
 date: "2026-10-14T19:15:00+02:00"
 ---
+
+The kit I use.
 ```
 
-Bandnames are titled, so use `{slug}` in their path, not `{HH}{mm}`.
+Pages are titled, so use `{slug}` in their path, not `{HH}{mm}`. They are not listed by
+date, so a site normally keeps them out of its feeds and indexes. The importer only takes
+pages that have a `date` (the rest, such as `about.md`, are not posts) and only files
+directly in `content/`.
 
 ## Examples
 

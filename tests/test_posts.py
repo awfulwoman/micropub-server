@@ -26,7 +26,7 @@ TYPES = {
     "article": pt(),
     "bookmark": pt(discovery="bookmark-of"),
     "checkin": pt(discovery="checkin", discovery_first=True),
-    "bandname": pt(channel="bandnames"),
+    "page": pt(channel="pages"),
     "quote": pt(discovery="quotation-of"),
 }
 
@@ -57,9 +57,7 @@ def test_discover(props, expected):
 
 
 def test_discover_channel_binding():
-    assert (
-        discover_post_type(TYPES, {"name": "Wife Biscuits", "channel": ["bandnames"]}) == "bandname"
-    )
+    assert discover_post_type(TYPES, {"name": "Uses", "channel": ["pages"]}) == "page"
 
 
 # --- slugs -------------------------------------------------------------------
@@ -166,11 +164,11 @@ def test_normalise_syndicate_to_shapes():
 
 
 def test_normalise_channel_default_and_selected():
-    ch = ["main", "bandnames"]
+    ch = ["main", "pages"]
     assert n({}, channels=ch)["channel"] == ["main"]
-    assert n({"mp-channel": "bandnames"}, channels=ch)["channel"] == ["bandnames"]
+    assert n({"mp-channel": "pages"}, channels=ch)["channel"] == ["pages"]
     assert n({"mp-channel": "nope"}, channels=ch)["channel"] == ["main"]
-    assert "mp-channel" not in n({"mp-channel": "bandnames"}, channels=ch)
+    assert "mp-channel" not in n({"mp-channel": "pages"}, channels=ch)
 
 
 def test_normalise_slug_and_status():

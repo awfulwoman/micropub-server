@@ -26,7 +26,7 @@ def test_config(client, bearer):
     body = get(client, bearer, q="config").json()
     assert body["media-endpoint"] == "https://indie.awfulwoman.com/media"
     assert body["syndicate-to"] == []
-    assert {c["uid"] for c in body["channels"]} == {"main", "bandnames"}
+    assert {c["uid"] for c in body["channels"]} == {"main", "pages"}
     types = {t["type"]: t for t in body["post-types"]}
     assert types["note"]["name"] == "Note"
     assert types["note"]["required-properties"] == ["content"]

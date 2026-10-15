@@ -24,7 +24,7 @@ FILES = {
     # no slug in the front matter: Hugo's /posts/:slug/ permalink uses the title, not the folder
     "content/posts/2025/new-apartment/index.md": "---\ntitle: New Apartment, New Smarts\ndate: '2025-04-09T19:44:05+02:00'\n---\nWe bought a flat.\n",
     "content/checkins/2019/3384/index.md": "---\ntitle: 'Checked in at Gesundbrunnen, Berlin'\ndate: '2019-10-05T15:14:35+00:00'\nplace_geo:\n  lat: 52.54\n  lng: 13.38\nplace_name: 'Gesundbrunnen, Berlin'\n---\nBack in Berlin!\n",
-    "content/bandnames/2024/11/wifebiscuits.md": "---\ntitle: Wife Biscuits\ndate: 2024-11-22\n---\n",
+    "content/colophon.md": "---\ntitle: Colophon\ndate: 2024-11-22\nmenus:\n  footer:\n    weight: 5\n---\nHow this site is made.\n",
     "content/notes/2025/03/01/0900.md": "---\ntitle: A draft\ndate: '2025-03-01T09:00:00+01:00'\ndraft: true\n---\nNot yet.\n",
     # things that are not posts, or are broken
     "content/guineapigs/ginger/index.md": "---\ntitle: Ginger\n---\n",
@@ -68,7 +68,7 @@ async def test_type_comes_from_the_section_not_the_content(populated):
     # a note with a title is a note here, although discovery on its content would say article
     assert rows["content/notes/2025/02/11/1855.md"]["post_type"] == "note"
     assert rows["content/posts/2013/old-post/index.md"]["post_type"] == "article"
-    assert rows["content/bandnames/2024/11/wifebiscuits.md"]["post_type"] == "bandname"
+    assert rows["content/colophon.md"]["post_type"] == "page"
     assert rows["content/likes/2021/20210223t114722/index.md"]["post_type"] == "like"
 
 
@@ -96,12 +96,19 @@ async def test_article_url_slug_follows_hugo_not_the_folder(populated):
     assert json.loads(row["properties"])["slug"] == "new-apartment-new-smarts"
 
 
-async def test_band_names_use_the_filename_not_the_title(populated):
+async def test_pages_sit_at_the_site_root_and_keep_their_menus(populated):
     await run(populated)
-    row = posts(populated)["content/bandnames/2024/11/wifebiscuits.md"]
-    assert (
-        row["url"] == "https://awfulwoman.com/bandnames/2024/11/wifebiscuits/"
-    )  # not wife-biscuits
+    row = posts(populated)["content/colophon.md"]
+    assert row["url"] == "https://awfulwoman.com/colophon/"
+    assert json.loads(row["properties"])["front-matter"]["menus"] == {"footer": {"weight": 5}}
+
+
+async def test_undated_pages_and_unknown_sections_are_left_alone(populated):
+    report = await run(populated)
+    paths = set(posts(populated))
+    # about.md has no date, and guineapigs is not a post type: neither is a post, neither is a problem
+    assert "content/about.md" not in paths and "content/guineapigs/ginger/index.md" not in paths
+    assert "content/about.md" not in dict(report.problems)
 
 
 async def test_properties_are_reversed_from_front_matter(populated):
@@ -118,9 +125,7 @@ async def test_all_the_date_formats_in_the_wild(populated):
     rows = posts(populated)
     published = {path: r["published"] for path, r in rows.items()}
     assert published["content/notes/2018/3289/index.md"] == "2018-05-01T12:00:00+02:00"  # ...Z
-    assert (
-        published["content/bandnames/2024/11/wifebiscuits.md"] == "2024-11-22T00:00:00+01:00"
-    )  # date only
+    assert published["content/colophon.md"] == "2024-11-22T00:00:00+01:00"  # date only
     assert published["content/checkins/2019/3384/index.md"] == "2019-10-05T17:14:35+02:00"
 
 

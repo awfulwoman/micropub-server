@@ -37,7 +37,7 @@ def create(client, type_, data=None, files=None, token=None):
 def test_type_chooser_lists_configured_types(ui):
     r = ui.get("/posts/new")
     assert r.status_code == 200
-    for name in ("Note", "Post", "Bookmark", "Photo", "Checkin", "Quote", "Band name"):
+    for name in ("Note", "Post", "Bookmark", "Photo", "Checkin", "Quote", "Page"):
         assert name in r.text
     assert 'href="/posts/new/note"' in r.text
 
@@ -189,9 +189,9 @@ def test_checkin(ui, site):
     assert "Coffee" in body
 
 
-def test_band_name_goes_to_its_own_section(ui, site):
-    create(ui, "bandname", {"name": "Wife Biscuits"})
-    assert (site / "content/bandnames/2026/10/wife-biscuits.md").exists()
+def test_page_goes_to_the_site_root(ui, site):
+    create(ui, "page", {"name": "Uses", "content": "My kit."})
+    assert (site / "content/uses.md").exists()
 
 
 def test_quote(ui, site):

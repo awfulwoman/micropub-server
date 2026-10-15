@@ -58,13 +58,13 @@ in this order:
 
 0. **Explicit choice (our extension).** A post type wins outright when
    either:
-   - `mp-channel` names a channel bound to it (`channel: bandnames` in its
+   - `mp-channel` names a channel bound to it (`channel: pages` in its
      config), or
    - its `discovery` property is present **and** it has
      `discovery_first: true`.
 
-   Bandnames need this. A bandname is only a `name`, which would otherwise
-   be a note. Checkins use `discovery_first`, so a checkin with a photo
+   Pages need this. A page is a `name` and `content`, which would otherwise
+   be an article. Checkins use `discovery_first`, so a checkin with a photo
    (common from OwnYourSwarm) stays a checkin.
 1. `type == "event"`: **event**.
 2. A configured post type whose `h` value is not `entry` and equals `type`.

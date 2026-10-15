@@ -15,9 +15,7 @@ def test_the_site_file_is_a_valid_overlay():
         YAML(typ="safe").load((DEPLOY / "site-micropub.yaml").read_text())
     )
     assert overlay.mapping["bookmark-of"] == "bookmark_of" and "channel" in overlay.omit
-    assert {"note", "article", "bookmark", "photo", "checkin", "bandname"} <= set(
-        overlay.post_types
-    )
+    assert {"note", "article", "bookmark", "photo", "checkin", "page"} <= set(overlay.post_types)
     assert overlay.post_types["article"].import_slug == "title"
 
 

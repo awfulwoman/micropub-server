@@ -144,19 +144,19 @@ post_types:
       path: content/checkins/{yyyy}/{MM}/{dd}/{HH}{mm}/{filename}
     properties: [checkin, content, photo, category]
     required_properties: [checkin]
-  bandname:
-    name: Band name
-    channel: bandnames             # chosen by mp-channel=bandnames
+  page:
+    name: Page
+    channel: pages                 # chosen by mp-channel=pages
     post:
-      path: content/bandnames/{yyyy}/{MM}/{slug}.md
-      url: bandnames/{yyyy}/{MM}/{slug}/
-    properties: [name]
-    required_properties: [name]
+      path: content/{slug}.md      # at the site root, so the URL is /{slug}/
+      url: "{slug}/"
+    properties: [name, content]
+    required_properties: [name, content]
   # like, reply, repost: as in spec 06
 
 channels:                          # keyed by uid. The first is the default.
   main: {name: Main}
-  bandnames: {name: Band names}
+  pages: {name: Pages}
 
 deploy:
   workflow: Build site and push to server   # the run that means "the site is live"

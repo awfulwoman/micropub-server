@@ -32,7 +32,7 @@ of writing files:
   Hermes, unlike a local script.
 - Keep the skill's table of inputs per type. Map each one onto Micropub
   properties: `quote` → `quotation-of` + `content`, `checkin` → a `checkin`
-  h-card, `bandname` → `name` + `mp-channel=bandnames`.
+  h-card, `page` → `name` + `content` + `mp-channel=pages`.
 - Report the post's URL and its web UI edit link (`/posts/{uid}/edit`).
 
 `awfulwoman-list-drafts` can use `q=source` with a draft filter in the same

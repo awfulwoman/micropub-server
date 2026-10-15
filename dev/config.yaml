@@ -10,7 +10,7 @@ store:
 
 channels:
   main: {name: Main}
-  bandnames: {name: Band names}
+  pages: {name: Pages}
 
 post_types:
   note:
@@ -81,11 +81,11 @@ post_types:
       url: checkins/{yyyy}/{MM}/{dd}/{HH}{mm}/
     properties: [checkin, content, photo, category]
     required_properties: [checkin]
-  bandname:
-    name: Band name
-    channel: bandnames
+  page:
+    name: Page
+    channel: pages
     post:
-      path: content/bandnames/{yyyy}/{MM}/{slug}.md
-      url: bandnames/{yyyy}/{MM}/{slug}/
-    properties: [name]
-    required_properties: [name]
+      path: content/{slug}.md
+      url: "{slug}/"
+    properties: [name, content]
+    required_properties: [name, content]

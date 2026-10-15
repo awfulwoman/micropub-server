@@ -24,7 +24,7 @@ VERIFIER = "v" * 43
 CONFIG = {
     "application": {"time_zone": "Europe/Berlin"},
     "store": {"type": "filesystem", "directory": "SITE"},
-    "channels": {"main": {"name": "Main"}, "bandnames": {"name": "Band names"}},
+    "channels": {"main": {"name": "Main"}, "pages": {"name": "Pages"}},
     "post_types": {
         "note": {
             "name": "Note",
@@ -89,13 +89,12 @@ CONFIG = {
                 "url": "checkins/{yyyy}/{MM}/{dd}/{HH}{mm}/",
             },
         },
-        "bandname": {
-            "name": "Band name",
-            "channel": "bandnames",
-            "post": {
-                "path": "content/bandnames/{yyyy}/{MM}/{slug}.md",
-                "url": "bandnames/{yyyy}/{MM}/{slug}/",
-            },
+        "page": {
+            "name": "Page",
+            "channel": "pages",
+            "post": {"path": "content/{slug}.md", "url": "{slug}/"},
+            "properties": ["name", "content"],
+            "required_properties": ["name", "content"],
         },
         "bookmark": {
             "name": "Bookmark",

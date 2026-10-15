@@ -47,16 +47,21 @@ def test_quote(client, bearer, site):
     assert front["quote_of"] == "https://example.com/post" and "A fine sentence." in body
 
 
-def test_bandname_is_front_matter_only(client, bearer, site):
-    url = create(client, bearer, data={"name": "Wife Biscuits", "mp-channel": "bandnames"})
-    assert url == "https://awfulwoman.com/bandnames/2026/10/wife-biscuits/"
-    text = (site / "content/bandnames/2026/10/wife-biscuits.md").read_text()
-    assert text == '---\ntitle: Wife Biscuits\ndate: "2026-10-14T19:10:47+02:00"\n---\n'
+def test_page_goes_to_the_site_root(client, bearer, site):
+    url = create(
+        client,
+        bearer,
+        data={"name": "Uses", "content": "My kit.", "mp-channel": "pages"},
+    )
+    assert url == "https://awfulwoman.com/uses/"
+    front, body = fm(site, "content/uses.md")
+    assert front["title"] == "Uses" and "My kit." in body
 
 
-def test_name_without_bandname_channel_is_a_note(client, bearer, site):
-    create(client, bearer, data={"name": "Wife Biscuits"})
-    assert (site / "content/notes/2026/10/14/1910.md").exists()
+def test_a_titled_post_without_the_pages_channel_is_an_article_not_a_page(client, bearer, site):
+    url = create(client, bearer, data={"name": "Uses", "content": "My kit."})
+    assert url == "https://awfulwoman.com/posts/uses/"
+    assert not (site / "content/uses.md").exists()
 
 
 CHECKIN = {

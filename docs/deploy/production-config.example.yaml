@@ -20,7 +20,7 @@ store:
 
 channels:
   main: {name: Main}
-  bandnames: {name: Band names}
+  pages: {name: Pages}
 
 # The site owns its post types and front matter mapping. If this file is missing or broken the
 # server falls back to the copies in this config, so keep a copy of docs/deploy/site-micropub.yaml's

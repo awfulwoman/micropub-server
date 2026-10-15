@@ -42,7 +42,7 @@ DEFAULT_PROPERTIES = {
     "quote": ["quotation-of", "content"],
     "photo": ["photo", "name", "content", "category", "location"],
     "checkin": ["checkin", "content", "photo", "category"],
-    "bandname": ["name"],
+    "page": ["name", "content"],
 }
 DEFAULT_REQUIRED = {
     "article": ["name", "content"],
@@ -53,7 +53,7 @@ DEFAULT_REQUIRED = {
     "quote": ["quotation-of", "content"],
     "photo": ["photo"],
     "checkin": ["checkin"],
-    "bandname": ["name"],
+    "page": ["name", "content"],
     "note": ["content"],
 }
 
