@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import hashlib
 import re
+import secrets
 from datetime import UTC, datetime
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -59,14 +59,18 @@ def _text(value: Any) -> str:
     return value or ""
 
 
+# Unguessable: not derived from the date or a counter, so hidden posts cannot be enumerated.
+_ID_ALPHABET = "abcdefghjkmnpqrstvwxyz23456789"
+_ID_LENGTH = 8
+
+
 def get_slug(props: dict[str, Any], separator: str) -> str:
     suggested = props.get("mp-slug")
     name = props.get("name")
     source = suggested or (" ".join(str(name).split()[:5]) if name else "")
     slug = slugify(str(source), separator=separator) if source else ""
     if not slug:
-        digest = hashlib.md5(str(props.get("published", "")).encode()).hexdigest()  # noqa: S324
-        slug = digest[:5]
+        slug = "".join(secrets.choice(_ID_ALPHABET) for _ in range(_ID_LENGTH))
     return slug
 
 

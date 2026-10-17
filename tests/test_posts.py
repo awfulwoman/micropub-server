@@ -69,10 +69,12 @@ def test_slug_from_name_first_five_words():
     assert get_slug({"name": "One two three four five six seven"}, "-") == "one-two-three-four-five"
 
 
-def test_slug_falls_back_to_hash():
-    slug = get_slug({"published": "2026-10-14T19:10:00+02:00"}, "-")
-    assert len(slug) == 5 and slug.isalnum()
-    assert slug == get_slug({"published": "2026-10-14T19:10:00+02:00"}, "-")
+def test_slug_falls_back_to_random_id():
+    # Not derived from anything on the post, so a URL cannot be guessed from its date.
+    props = {"published": "2026-10-14T19:10:00+02:00"}
+    slug = get_slug(props, "-")
+    assert len(slug) == 8 and slug.isalnum() and slug == slug.lower()
+    assert slug != get_slug(props, "-")
 
 
 def test_slug_separator():

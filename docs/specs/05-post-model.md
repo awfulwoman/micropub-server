@@ -99,8 +99,10 @@ In order of preference:
 
 1. `mp-slug`, if the client sent one.
 2. The first 5 words of `name`.
-3. The first 5 characters of `md5(published)`. This gives the random-looking
-   `1fe47` seen on the test note.
+3. A random 8-character id from `[a-z2-9]` (no look-alike characters). It is
+   not derived from the date, a counter or the content, so the URL of an
+   unlisted post cannot be guessed. (The earlier `md5(published)[:5]` gave
+   `1fe47`, which is both short and reproducible.)
 
 A client-sent `slug` property is ignored, and an existing slug is kept unless `mp-slug` is given
 (see update in [03](03-micropub.md#update)).

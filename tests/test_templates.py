@@ -218,3 +218,15 @@ def test_front_matter_extras_are_written_back_as_found():
     )
     fm = split(out)[0]
     assert fm["basedomain"] == "www.theatlantic.com" and fm["strapline"] == "kept"
+
+
+def test_aliases_are_written_after_the_other_keys():
+    props = {"name": "Hi", "published": "2026-10-14T19:10:00+02:00"}
+    fm, _ = split(render_post(props, Template(), aliases=["/posts/2026/10/14/hi/"]))
+    assert fm["aliases"] == ["/posts/2026/10/14/hi/"]
+
+
+def test_aliases_merge_with_imported_ones_without_duplicates():
+    props = {"name": "Hi", "front-matter": {"aliases": ["/old/", "/posts/2026/10/14/hi/"]}}
+    fm, _ = split(render_post(props, Template(), aliases=["/posts/2026/10/14/hi/"]))
+    assert fm["aliases"] == ["/old/", "/posts/2026/10/14/hi/"]

@@ -95,14 +95,14 @@ post_types:
   note:
     name: Note
     post:
-      path: content/notes/{yyyy}/{MM}/{dd}/{HH}{mm}.md
-      url: notes/{yyyy}/{MM}/{dd}/{HH}{mm}/
+      path: content/notes/{yyyy}/{MM}/{dd}/{slug}.md
+      url: notes/{yyyy}/{MM}/{dd}/{slug}/
     properties: [content, category, location, photo]
     required_properties: [content]
   article:
     name: Post
     post:
-      path: content/posts/{yyyy}/{slug}/index.md
+      path: content/posts/{yyyy}/{MM}/{dd}/{slug}/index.md
       url: posts/{slug}/
     media:
       path: content/posts/{yyyy}/{slug}/{filename}
@@ -112,25 +112,25 @@ post_types:
     name: Bookmark
     discovery: bookmark-of
     post:
-      path: content/bookmarks/{yyyy}/{MM}/{dd}/{HH}{mm}.md
-      url: bookmarks/{yyyy}/{MM}/{dd}/{HH}{mm}/
+      path: content/bookmarks/{yyyy}/{MM}/{dd}/{slug}.md
+      url: bookmarks/{yyyy}/{MM}/{dd}/{slug}/
     properties: [bookmark-of, name, content, category]
     required_properties: [bookmark-of]
   photo:
     name: Photo
     post:
-      path: content/photos/{yyyy}/{MM}/{dd}/{HH}{mm}/index.md
-      url: photos/{yyyy}/{MM}/{dd}/{HH}{mm}/
+      path: content/photos/{yyyy}/{MM}/{dd}/{slug}/index.md
+      url: photos/{yyyy}/{MM}/{dd}/{slug}/
     media:
-      path: content/photos/{yyyy}/{MM}/{dd}/{HH}{mm}/{filename}
+      path: content/photos/{yyyy}/{MM}/{dd}/{slug}/{filename}
     properties: [photo, name, content, category, location]
     required_properties: [photo]
   quote:
     name: Quote
     discovery: quotation-of
     post:
-      path: content/quotes/{yyyy}/{MM}/{dd}/{HH}{mm}.md
-      url: quotes/{yyyy}/{MM}/{dd}/{HH}{mm}/
+      path: content/quotes/{yyyy}/{MM}/{dd}/{slug}.md
+      url: quotes/{yyyy}/{MM}/{dd}/{slug}/
     properties: [quotation-of, content, author]
     required_properties: [quotation-of, content]
   checkin:
@@ -138,10 +138,10 @@ post_types:
     discovery: checkin
     discovery_first: true          # a checkin with a photo stays a checkin
     post:
-      path: content/checkins/{yyyy}/{MM}/{dd}/{HH}{mm}/index.md
-      url: checkins/{yyyy}/{MM}/{dd}/{HH}{mm}/
+      path: content/checkins/{yyyy}/{MM}/{dd}/{slug}/index.md
+      url: checkins/{yyyy}/{MM}/{dd}/{slug}/
     media:
-      path: content/checkins/{yyyy}/{MM}/{dd}/{HH}{mm}/{filename}
+      path: content/checkins/{yyyy}/{MM}/{dd}/{slug}/{filename}
     properties: [checkin, content, photo, category]
     required_properties: [checkin]
   page:

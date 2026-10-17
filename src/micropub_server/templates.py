@@ -38,7 +38,9 @@ def _num(value: Any) -> Any:
         return value
 
 
-def _build_front_matter(props: dict[str, Any], tpl: Template) -> dict[str, Any]:
+def _build_front_matter(
+    props: dict[str, Any], tpl: Template, aliases: list[str] | None = None
+) -> dict[str, Any]:
     out: dict[str, Any] = {}
     omit = set(tpl.omit)
     mapping = dict(tpl.mapping)
@@ -93,6 +95,8 @@ def _build_front_matter(props: dict[str, Any], tpl: Template) -> dict[str, Any]:
     if isinstance(extras, dict):
         for key, value in extras.items():
             out.setdefault(key, value)
+    if aliases:
+        out["aliases"] = list(dict.fromkeys([*to_list(out.get("aliases")), *aliases]))
     return _order(out)
 
 
@@ -113,8 +117,8 @@ def _body(props: dict[str, Any]) -> str:
     return content or ""
 
 
-def render_post(props: dict[str, Any], tpl: Template) -> str:
-    fm = _build_front_matter(props, tpl)
+def render_post(props: dict[str, Any], tpl: Template, aliases: list[str] | None = None) -> str:
+    fm = _build_front_matter(props, tpl, aliases)
     stream = io.StringIO()
     if fm:
         _yaml().dump(fm, stream)

@@ -101,6 +101,8 @@ class Template(_Model):
 class Paths(_Model):
     path: str
     url: str | None = None
+    # Extra URL paths that redirect to the post (Hugo `aliases`), rendered like `url`.
+    aliases: list[str] = Field(default_factory=list)
 
 
 class PostType(_Model):

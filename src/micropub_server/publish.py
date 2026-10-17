@@ -74,6 +74,17 @@ async def _taken(s: AppState, path: str, url: str, exclude_uid: str = "") -> boo
     return await s.store.exists(path)
 
 
+def render_file(s: AppState, props: dict[str, Any]) -> str:
+    """Render a post's file, including the post type's configured aliases."""
+    cfg = s.config.post_types.get(props.get("post-type", ""))
+    aliases = []
+    if cfg and cfg.post.aliases and props.get("published"):
+        tz = s.config.application.time_zone
+        sep = s.config.publication.slug_separator
+        aliases = [render_template(a, props, tz=tz, separator=sep) for a in cfg.post.aliases]
+    return render_post(props, s.template, aliases)
+
+
 async def _choose_path(
     s: AppState, props: dict[str, Any], post_type: str, cfg, exclude_uid: str = ""
 ) -> tuple[str, str]:
@@ -240,7 +251,7 @@ async def create_post(
 
     media_changes, media_actions = await _place_media(s, props, path, url, uploads, uid)
 
-    content = render_post(props, s.template)
+    content = render_file(s, props)
     message = s.config.publication.commit_message.format(
         action="create", post_type=post_type, file_type="post"
     )
@@ -403,7 +414,7 @@ async def update_post(
         .astimezone(ZoneInfo(app.time_zone) if app.time_zone != "client" else UTC)
         .isoformat(timespec="seconds")
     )
-    content = render_post(props, s.template).encode()
+    content = render_file(s, props).encode()
 
     changes: list = [Move(old_path, new_path, content) if moved else Put(old_path, content)]
     media_rows = []
@@ -464,7 +475,7 @@ async def undelete_post(s: AppState, url: str, *, draft_mode: bool = False) -> s
     props = json.loads(row["deleted_properties"])
     if draft_mode:
         props["post-status"] = "draft"
-    content = render_post(props, s.template).encode()
+    content = render_file(s, props).encode()
     sha = await _commit(s, [Put(row["path"], content)], _message(s, "undelete", row["post_type"]))
     record_deploy(s, sha, row["uid"], "undelete")
     s.db.execute(

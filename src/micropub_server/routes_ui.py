@@ -20,9 +20,15 @@ from .deploys import build_label
 from .forms import LABELS, LINKS, PHOTO_SLOTS, build_post, type_fields, type_required
 from .http import state_of
 from .jf2 import jf2_to_mf2
-from .publish import MicropubError, create_post, delete_post, undelete_post, update_post
+from .publish import (
+    MicropubError,
+    create_post,
+    delete_post,
+    render_file,
+    undelete_post,
+    update_post,
+)
 from .queries import _cursor, _decode_cursor, get_categories
-from .templates import render_post
 from .ui import page, safe_next, signed_in
 
 PAGE_SIZE = 40
@@ -386,7 +392,7 @@ async def post_page(request: Request, session: dict[str, Any]) -> Response:
         notice=notice,
         waiting=bool(props.get("mp-syndicate-to")) and not deleted and bool(s.targets),
         build=build_label(s, row["uid"]),
-        file_text=render_post(props, s.template) if not deleted else "",
+        file_text=render_file(s, props) if not deleted else "",
     )
 
 

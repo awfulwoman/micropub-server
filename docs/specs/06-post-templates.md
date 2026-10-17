@@ -63,13 +63,28 @@ post_types:
   note:
     name: Note
     post:
-      path: content/notes/{yyyy}/{MM}/{dd}/{HH}{mm}.md
-      url: notes/{yyyy}/{MM}/{dd}/{HH}{mm}/
+      path: content/notes/{yyyy}/{MM}/{dd}/{slug}.md
+      url: notes/{yyyy}/{MM}/{dd}/{slug}/
   # …
 ```
 
 The server's `config.yaml` keeps only what is about the server: the store,
 secrets, syndication, media limits.
+
+### Aliases
+
+A post type may list `post.aliases`: extra URL paths, rendered like `post.url`,
+that are written to the `aliases:` front-matter key (merged with any the
+importer kept, no duplicates). awfulwoman.com uses it so that
+`/posts/YYYY/MM/DD/<slug>/` redirects to the canonical `/posts/<slug>/`:
+
+```yaml
+article:
+  post:
+    path: content/posts/{yyyy}/{MM}/{dd}/{slug}/index.md
+    url: posts/{slug}/
+    aliases: ["/posts/{yyyy}/{MM}/{dd}/{slug}/"]
+```
 
 ## Field mapping
 
@@ -117,15 +132,15 @@ directory structure, because `hugo.yaml` only sets a permalink for `posts`.
 
 | Type | `post.path` | `post.url` | Bundle? |
 | --- | --- | --- | --- |
-| article | `content/posts/{yyyy}/{slug}/index.md` | `posts/{slug}/` | yes |
-| note | `content/notes/{yyyy}/{MM}/{dd}/{HH}{mm}.md` | `notes/{yyyy}/{MM}/{dd}/{HH}{mm}/` | no |
-| bookmark | `content/bookmarks/{yyyy}/{MM}/{dd}/{HH}{mm}.md` | `bookmarks/{yyyy}/{MM}/{dd}/{HH}{mm}/` | no |
-| like | `content/likes/{yyyy}/{MM}/{dd}/{HH}{mm}.md` | `likes/{yyyy}/{MM}/{dd}/{HH}{mm}/` | no |
-| reply | `content/replies/{yyyy}/{MM}/{dd}/{HH}{mm}.md` | `replies/{yyyy}/{MM}/{dd}/{HH}{mm}/` | no |
-| repost | `content/reposts/{yyyy}/{MM}/{dd}/{HH}{mm}.md` | `reposts/{yyyy}/{MM}/{dd}/{HH}{mm}/` | no |
-| quote | `content/quotes/{yyyy}/{MM}/{dd}/{HH}{mm}.md` | `quotes/{yyyy}/{MM}/{dd}/{HH}{mm}/` | no |
-| photo | `content/photos/{yyyy}/{MM}/{dd}/{HH}{mm}/index.md` | `photos/{yyyy}/{MM}/{dd}/{HH}{mm}/` | yes |
-| checkin | `content/checkins/{yyyy}/{MM}/{dd}/{HH}{mm}/index.md` | `checkins/{yyyy}/{MM}/{dd}/{HH}{mm}/` | yes (photos from Swarm) |
+| article | `content/posts/{yyyy}/{MM}/{dd}/{slug}/index.md` | `posts/{slug}/` | yes |
+| note | `content/notes/{yyyy}/{MM}/{dd}/{slug}.md` | `notes/{yyyy}/{MM}/{dd}/{slug}/` | no |
+| bookmark | `content/bookmarks/{yyyy}/{MM}/{dd}/{slug}.md` | `bookmarks/{yyyy}/{MM}/{dd}/{slug}/` | no |
+| like | `content/likes/{yyyy}/{MM}/{dd}/{slug}.md` | `likes/{yyyy}/{MM}/{dd}/{slug}/` | no |
+| reply | `content/replies/{yyyy}/{MM}/{dd}/{slug}.md` | `replies/{yyyy}/{MM}/{dd}/{slug}/` | no |
+| repost | `content/reposts/{yyyy}/{MM}/{dd}/{slug}.md` | `reposts/{yyyy}/{MM}/{dd}/{slug}/` | no |
+| quote | `content/quotes/{yyyy}/{MM}/{dd}/{slug}.md` | `quotes/{yyyy}/{MM}/{dd}/{slug}/` | no |
+| photo | `content/photos/{yyyy}/{MM}/{dd}/{slug}/index.md` | `photos/{yyyy}/{MM}/{dd}/{slug}/` | yes |
+| checkin | `content/checkins/{yyyy}/{MM}/{dd}/{slug}/index.md` | `checkins/{yyyy}/{MM}/{dd}/{slug}/` | yes (photos from Swarm) |
 | page | `content/{slug}.md` | `{slug}/` | no |
 
 Two posts of the same type in the same minute get `-2` from the collision
@@ -150,7 +165,7 @@ date: "2026-10-14T19:15:00+02:00"
 The kit I use.
 ```
 
-Pages are titled, so use `{slug}` in their path, not `{HH}{mm}`. They are not listed by
+Pages are titled, so use `{slug}` in their path, not `{slug}`. They are not listed by
 date, so a site normally keeps them out of its feeds and indexes. The importer only takes
 pages that have a `date` (the rest, such as `about.md`, are not posts) and only files
 directly in `content/`.
