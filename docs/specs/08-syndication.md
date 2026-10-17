@@ -76,7 +76,7 @@ Every status carries the post's `uid` as an `Idempotency-Key`, so a retry never 
 | `repost-of` with content | A status with the text and the URL. |
 | `in-reply-to` a status on the same instance | A status replying to that status id. |
 | `in-reply-to` elsewhere | Skip (return None), so it does not show as an orphan. |
-| has `name` (article) | A status `"{name} {url}"`. |
+| has `name` (article) | A status of the title, then the `summary` (else the first paragraph of the content, cut to fit with `…`), then the permalink. Just the title and permalink if there is no room for an excerpt. |
 | otherwise | A status from the content: HTML to plain text, links kept, shortened to the character limit with `…`, plus `\n\n{url}` when `include_permalink`. |
 | `photo` | Upload up to 4 images with alt text, attached to the status. |
 | `category` | Add hashtags, CamelCased (`self hosting` becomes `#SelfHosting`), deduplicated, within the limit. |

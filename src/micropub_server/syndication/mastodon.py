@@ -11,6 +11,7 @@ from .base import MediaFetcher, NotApplicable, SyndicationError
 from .text import URL_LENGTH, counted_length, hashtags, plain_text, truncate
 
 MAX_MEDIA = 4
+MIN_EXCERPT = 20  # below this many characters of room, an article is just its title
 VISIBILITY = {"public", "unlisted", "private"}
 
 
@@ -18,10 +19,17 @@ def build_status(props: dict[str, Any], *, limit: int = 500, include_permalink: 
     permalink = props["url"]
     reserve = (2 + URL_LENGTH) if include_permalink else 0
     commentary = plain_text(props.get("content"))
-    body = str(props["name"]) if props.get("name") else commentary
-    if props.get("repost-of") and commentary:
-        body = f"{body} {props['repost-of']}"
-    body = truncate(body, limit - reserve) if body else ""
+    if props.get("name"):
+        title = str(props["name"])
+        # An article shows its title, then the summary or else the first paragraph.
+        excerpt = plain_text(props.get("summary")) or commentary.split("\n\n", 1)[0]
+        room = limit - reserve - len(title) - 2
+        body = f"{title}\n\n{truncate(excerpt, room)}" if excerpt and room >= MIN_EXCERPT else title
+    else:
+        body = commentary
+        if props.get("repost-of") and commentary:
+            body = f"{body} {props['repost-of']}"
+        body = truncate(body, limit - reserve) if body else ""
 
     status = body
     if include_permalink:
