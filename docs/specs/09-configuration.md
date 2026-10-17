@@ -170,6 +170,7 @@ syndication:
     character_limit: 500
     include_permalink: true
     visibility: public          # public | unlisted | private
+    service_name: Mastodon      # label in clients; e.g. GoToSocial (any Mastodon-API server works)
   # bluesky:
   #   handle: awfulwoman.com
   #   service: https://bsky.social

@@ -128,6 +128,8 @@ class MastodonConfig(_Model):
     character_limit: int = 500
     include_permalink: bool = True
     visibility: Literal["public", "unlisted", "private"] = "public"
+    # Label shown in clients. Any server with the Mastodon client API works (GoToSocial, ...).
+    service_name: str = "Mastodon"
 
 
 class BlueskyConfig(_Model):

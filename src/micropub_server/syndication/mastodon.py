@@ -45,6 +45,7 @@ class MastodonTarget:
         character_limit: int = 500,
         include_permalink: bool = True,
         visibility: str = "public",
+        service_name: str = "Mastodon",
     ):
         self.base = url.rstrip("/")
         self.user = user
@@ -54,6 +55,7 @@ class MastodonTarget:
         self.limit = character_limit
         self.include_permalink = include_permalink
         self.visibility = visibility
+        self.service_name = service_name
         self._token = token
 
     @property
@@ -63,7 +65,7 @@ class MastodonTarget:
             "name": f"@{self.user} on {self.host}",
             "checked": self.checked,
             "service": {
-                "name": "Mastodon",
+                "name": self.service_name,
                 "url": self.base + "/",
                 "photo": f"{self.base}/favicon.ico",
             },

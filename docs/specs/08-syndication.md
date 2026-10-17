@@ -84,6 +84,11 @@ Every status carries the post's `uid` as an `Idempotency-Key`, so a retry never 
 The status ID for like, boost and reply is the last path segment of the
 target URL.
 
+GoToSocial and other servers that implement the Mastodon client API work unchanged: set `url`,
+`user`, `service_name` (the label in clients) and `character_limit` (GoToSocial defaults to 5000).
+Create the token in GoToSocial under Settings → Applications, with scopes `write:statuses` and
+`write:media`.
+
 ## Bluesky
 
 Settings: `handle`, `password` (app password, env `BLUESKY_PASSWORD`),

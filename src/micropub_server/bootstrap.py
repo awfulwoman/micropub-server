@@ -84,6 +84,7 @@ def build_state(settings: Settings) -> AppState:
                 character_limit=m.character_limit,
                 include_permalink=m.include_permalink,
                 visibility=m.visibility,
+                service_name=m.service_name,
             )
         )
     return AppState(

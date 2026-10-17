@@ -202,3 +202,8 @@ def test_target_description_for_micropub_clients():
     assert info["uid"] == f"{API}/@awfulwoman" and info["checked"] is True
     assert info["name"] == "@awfulwoman on indieweb.social"
     assert info["service"]["name"] == "Mastodon" and info["user"]["url"] == f"{API}/@awfulwoman"
+
+
+def test_service_name_is_configurable_for_other_servers():
+    info = target(service_name="GoToSocial").info
+    assert info["service"]["name"] == "GoToSocial"

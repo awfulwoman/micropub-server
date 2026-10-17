@@ -23,7 +23,7 @@ Built and tested:
 - **Publishing**: one Git commit per action to GitHub (or a directory), in the shape your Hugo
   site already uses. The site can own its own post types in `data/micropub.yaml`.
 - **Importing** the posts already on the site so they can be queried and edited.
-- **Syndication** to Mastodon and Bluesky, after the post is live. A GitHub `workflow_run` webhook
+- **Syndication** to Mastodon (or any Mastodon-API server, e.g. GoToSocial) and Bluesky, after the post is live. A GitHub `workflow_run` webhook
   tells the server when the site build finished, so each post shows building, live or failed.
 - **A web UI** for writing, editing, deleting and sharing posts, uploading files, and seeing which
   apps have access.
