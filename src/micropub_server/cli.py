@@ -1,4 +1,4 @@
-"""Command line: serve, hash-password, check, migrate."""
+"""Command line: serve, hash-password, check, migrate, token, import, backfill-targets."""
 
 from __future__ import annotations
 
@@ -108,6 +108,30 @@ def _import(args) -> int:
     return 0
 
 
+def _backfill_targets(args) -> int:
+    import asyncio
+
+    from .target_enrich import backfill_targets
+
+    try:
+        state = _state()
+    except ConfigError as exc:
+        print(f"config error: {exc}", file=sys.stderr)
+        return 1
+    asyncio.run(state.refresh_site_config())
+    report = asyncio.run(backfill_targets(state, dry_run=args.dry_run, delay=args.delay))
+    verb = "would update" if args.dry_run else "updated"
+    print(
+        f"{verb} {report.updated}, already done {report.skipped}, "
+        f"nothing found {report.nothing_found}, failed {report.failed}"
+    )
+    for url, props in report.changes:
+        print(f"  {url}")
+        for key, value in props.items():
+            print(f"    {key}: {value[:80]!r}")
+    return 1 if report.failed else 0
+
+
 def _serve(_args) -> int:
     import uvicorn
 
@@ -165,6 +189,18 @@ def main(argv: list[str] | None = None) -> int:
         help="afterwards, ask the live site for every imported URL",
     )
     imp.set_defaults(func=_import)
+    back = sub.add_parser(
+        "backfill-targets",
+        help="fetch the title, author and embed of the page each existing like, quote and "
+        "bookmark points at (run import first)",
+    )
+    back.add_argument(
+        "--dry-run", action="store_true", help="show what would be written, change nothing"
+    )
+    back.add_argument(
+        "--delay", type=float, default=1.0, help="seconds between fetches (default 1)"
+    )
+    back.set_defaults(func=_backfill_targets)
     args = parser.parse_args(argv)
     return (args.func if getattr(args, "func", None) else _serve)(args)
 

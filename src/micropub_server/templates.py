@@ -16,7 +16,10 @@ _INTERNAL = {"type", "post-type", "post-status", "content", "front-matter"}
 _DATES = {"date", "lastmod", "expiryDate"}
 _FRONT = ["title", "date", "lastmod", "draft"]
 _TYPE_SPECIFIC = [
-    "bookmark_of", "basedomain", "like_of", "repost_of", "in_reply_to", "quote_of",
+    "bookmark_of", "basedomain", "bookmark_author",
+    "like_of", "like_title", "like_author", "like_text", "like_oembed",
+    "repost_of", "in_reply_to",
+    "quote_of", "quote_title", "quote_author", "quote_text", "quote_oembed",
     "place_name", "place_geo",
 ]  # fmt: skip
 _AFTER = ["tags", "images", "videos", "syndication"]

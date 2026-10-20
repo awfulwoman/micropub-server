@@ -58,6 +58,8 @@ class Publication(_Model):
     locale: str = "en-GB"
     slug_separator: str = "-"
     enrich_post_data: bool = False
+    # Look up the title, author and embed of a liked, quoted or bookmarked page when posting.
+    fetch_target_meta: bool = True
     categories: list[str] | str = Field(default_factory=list)
     profile: dict[str, str] = Field(default_factory=dict)
     commit_message: str = "{action} {post_type} {file_type}"

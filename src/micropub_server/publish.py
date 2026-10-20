@@ -17,6 +17,7 @@ from .deploys import record as record_deploy
 from .media import Processed
 from .posts import discover_post_type, normalise, render_template
 from .stores import Delete, Move, Put, StoreError
+from .target_enrich import enrich_props, refresh_props
 from .templates import render_post
 from .update import UpdateError, apply_update
 from .util import base_domain, to_list
@@ -239,6 +240,7 @@ async def create_post(
         props["basedomain"] = base_domain(
             str(props["bookmark-of"])
         )  # the layout shows "Original link on ..."
+    await enrich_props(s, props)
 
     uid = str(uuid7())
     props["uid"] = uid  # so a {uuid} token in a path template works
@@ -383,6 +385,8 @@ async def update_post(
             props["basedomain"] = base_domain(str(props["bookmark-of"]))
         else:
             props.pop("basedomain", None)
+
+    await refresh_props(s, props, old)
 
     old_path, old_url = row["path"], row["url"]
     shape_changed = (

@@ -117,9 +117,10 @@ The defaults below match awfulwoman.com today. They are the first contents of
 | anything else | the same key with `-` replaced by `_` | so nothing is silently lost |
 | photo entry extras (`width`, `height`) | kept next to `file` and `alt` | |
 | `basedomain` | passed through | **derived once, when a bookmark is created or its link changes**, never while rendering, so old bookmarks do not gain it on an unrelated edit |
+| `like-title`, `like-author`, `like-text`, `like-oembed` (and `quote-…`; `bookmark-author`) | `like_title`, `like_author`, `like_text`, `like_oembed` … | **looked up once, when the post is created or its link changes** (see below). A value the client sent is never replaced. `*_text` and `*_oembed` are only kept when the target offers an embed. |
 
 Key order: `title`, `date`, `lastmod`, `draft`, the type-specific keys
-(`bookmark_of`, `basedomain`, `like_of`, …), `tags`, `images`,
+(`bookmark_of`, `basedomain`, `like_of`, `like_title`, …), `tags`, `images`,
 `syndication`, then the rest in alphabetical order.
 
 Indiekit also writes `publishDate` (a copy of `date`) and `uid`. **Leave
@@ -220,3 +221,42 @@ bundles.
 - It puts the body after the front matter as `content.text`, falling back to
   `content.html`.
 - It supports YAML, TOML and JSON front matter. We only need YAML.
+
+
+## Facts about the link target
+
+When a like, quote or bookmark is created, and when an edit changes its
+`like-of`, `quotation-of` or `bookmark-of`, the server looks the target up
+(`target_meta.py`) and saves what it learns in the front matter, so the site
+never fetches anything while it builds. Unrelated edits do not look again, and
+a changed link throws away the old page's values first.
+
+| Kind | Saved |
+| --- | --- |
+| like, quote | `title`, `author`, `text`, `oembed` |
+| bookmark | `author` (it already has its own title) |
+
+How each is found, best source first:
+
+- **title:** the page's h-entry `name`, then `og:title`, then `<title>`, with
+  a trailing ` | Site name` removed. A post with no title of its own (a toot, a
+  tweet) has none: its implied name is not a title.
+- **author:** the h-entry's author h-card, then `<meta name="author">`, then
+  JSON-LD. Never the site name.
+- **oembed:** Twitter and X use `publish.twitter.com/oembed`; any other page
+  that advertises `application/json+oembed` (Mastodon does) is asked there. The
+  markup is cleaned: no scripts or event handlers, iframes only over https. The
+  site adds the provider's script itself.
+- **text:** the original words of the embedded post, from the oEmbed markup or
+  the page's h-entry. Kept only alongside an `oembed`, so the page can show the
+  words if the embed does not load.
+
+The fetch uses the same guarded client as the link preview (no private
+addresses, every redirect hop checked), a 12 second limit, and never fails a
+post: if nothing is found the post is saved without the extra keys and the site
+falls back to the bare URL. Set `publication.fetch_target_meta: false` to turn it off.
+
+Existing posts: run `micropub-server import`, then
+`micropub-server backfill-targets --dry-run` to see what would be written, then
+without `--dry-run`. Posts that already have any of these keys are skipped. The
+backfill saves each post as an ordinary edit, so `lastmod` changes.

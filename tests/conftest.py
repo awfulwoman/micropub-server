@@ -121,8 +121,27 @@ def site(tmp_path):
     return d
 
 
+class FakeTargets:
+    """Stands in for the fetcher of link metadata: answers from `metas`, records what was asked."""
+
+    def __init__(self):
+        self.metas = {}
+        self.calls = []
+
+    async def __call__(self, url, resolver):
+        from micropub_server.target_meta import TargetMeta
+
+        self.calls.append(url)
+        return self.metas.get(url, TargetMeta())
+
+
 @pytest.fixture
-def state(tmp_path, site):
+def targets():
+    return FakeTargets()
+
+
+@pytest.fixture
+def state(tmp_path, site, targets):
     cfg_data = {**CONFIG, "store": {"type": "filesystem", "directory": str(site)}}
     config = Config.model_validate(cfg_data)
     settings = Settings(
@@ -142,6 +161,7 @@ def state(tmp_path, site):
         auth=AuthService(db, me=ME, token_ttl_days=90),
         store=FileSystemStore(site),
         resolver=public_resolver,
+        target_fetcher=targets,
     )
 
 

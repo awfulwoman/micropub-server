@@ -51,6 +51,7 @@ publication:
   locale: en-GB
   slug_separator: "-"
   enrich_post_data: false          # fetch mf2 for like-of etc.
+  fetch_target_meta: true          # save title, author, embed of liked/quoted/bookmarked pages
   categories: https://awfulwoman.com/tags/index.json   # list, or URL to a JSON list
   profile:                         # overrides h-card discovery for the profile scope
     name: Charlie O'Hara

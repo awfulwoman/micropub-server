@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from importlib import resources
@@ -22,6 +22,7 @@ from .auth.service import AuthService
 from .config import Config, PostType, Settings, SiteOverlay, Template
 from .db import Database
 from .stores import Store, StoreError
+from .target_meta import TargetMeta, fetch_target_meta
 
 log = logging.getLogger("micropub_server")
 
@@ -34,6 +35,7 @@ class AppState:
     auth: AuthService
     store: Store
     resolver: Resolver = system_resolver
+    target_fetcher: Callable[[str, Resolver], Awaitable[TargetMeta]] = fetch_target_meta
     clock: Callable[[], datetime] = lambda: datetime.now(UTC)
     store_problem: str | None = None
     site: SiteOverlay | None = None
