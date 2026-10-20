@@ -9,6 +9,7 @@ import sys
 from .auth.passwords import hash_password
 from .bootstrap import ConfigError, build_state
 from .config import Settings
+from .target_meta import KINDS
 
 
 def _hash_password(_args) -> int:
@@ -125,7 +126,9 @@ def _backfill_targets(args) -> int:
 
     async def run():
         await state.refresh_site_config()
-        return await backfill_targets(state, dry_run=args.dry_run, delay=args.delay)
+        return await backfill_targets(
+            state, dry_run=args.dry_run, delay=args.delay, only_type=args.type
+        )
 
     report = asyncio.run(run())
     verb = "would update" if args.dry_run else "updated"
@@ -208,6 +211,7 @@ def main(argv: list[str] | None = None) -> int:
     back.add_argument(
         "--delay", type=float, default=1.0, help="seconds between fetches (default 1)"
     )
+    back.add_argument("--type", choices=sorted(KINDS), help="only this post type, e.g. like")
     back.set_defaults(func=_backfill_targets)
     args = parser.parse_args(argv)
     return (args.func if getattr(args, "func", None) else _serve)(args)

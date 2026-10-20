@@ -84,7 +84,7 @@ class BackfillReport:
 
 
 async def backfill_targets(
-    s: AppState, *, dry_run: bool = False, delay: float = 1.0
+    s: AppState, *, dry_run: bool = False, delay: float = 1.0, only_type: str | None = None
 ) -> BackfillReport:
     """Fetch metadata for existing likes, quotes and bookmarks that have none yet."""
     from .publish import MicropubError, update_post
@@ -94,6 +94,8 @@ async def backfill_targets(
         "SELECT url, post_type, properties FROM posts WHERE deleted IS NULL AND post_type IN (?, ?, ?)",
         tuple(KINDS),
     )
+    if only_type:
+        rows = [row for row in rows if row["post_type"] == only_type]
     fetched = False
     for row in rows:
         kind = row["post_type"]

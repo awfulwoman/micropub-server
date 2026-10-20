@@ -150,3 +150,12 @@ async def test_backfill_reports_pages_that_gave_nothing(client, full, site, targ
     make(client, full, **{"like-of": ADACTIO})
     report = await backfill_targets(state, delay=0)
     assert (report.updated, report.nothing_found) == (0, 1)
+
+
+async def test_backfill_can_be_limited_to_one_type(client, full, site, targets, state):
+    make(client, full, **{"like-of": ADACTIO})
+    make(client, full, **{"bookmark-of": TOOT, "name": "b"})
+    targets.metas.update({ADACTIO: META, TOOT: TOOT_META})
+    report = await backfill_targets(state, delay=0, only_type="like")
+    assert report.updated == 1
+    assert "bookmark_author" not in fm(site, BOOKMARK)
