@@ -256,7 +256,23 @@ addresses, every redirect hop checked), a 12 second limit, and never fails a
 post: if nothing is found the post is saved without the extra keys and the site
 falls back to the bare URL. Set `publication.fetch_target_meta: false` to turn it off.
 
-Existing posts: run `micropub-server import`, then
-`micropub-server backfill-targets --dry-run` to see what would be written, then
-without `--dry-run`. Posts that already have any of these keys are skipped. The
-backfill saves each post as an ordinary edit, so `lastmod` changes.
+### Backfilling existing posts
+
+Two ways, both skipping posts that already have any of these keys:
+
+1. **In a site checkout (preferred for large runs).**
+   `uv run python scripts/backfill_targets.py <checkout> --type like --dry-run`, then without
+   `--dry-run`. It only inserts lines after the `like_of` / `quote_of` / `bookmark_of` line
+   (`target_files.py`), so the result is a plain git diff, and `lastmod` is untouched. Commit and
+   push it, then bring the server's database in step, or the next edit through the server would
+   write the file without the new keys: copy the checkout's `content/<section>` and `data/` into the
+   container and run `micropub-server import --source <copy> --type like`. That import makes no
+   GitHub API calls.
+2. **Through the server.** `micropub-server backfill-targets --type like --dry-run`, then without.
+   Each post is saved as an ordinary edit (one commit through the GitHub API each, `lastmod`
+   changes). Use it for posts the server created itself, which `import` will not touch ("a post
+   already exists at this path").
+
+The GitHub store shares its token's 5,000 requests an hour with anything else using that account.
+`import` without `--source` reads every file through the API, so a whole-site import (about 3,000
+files) can use the hour up and make every commit fail with HTTP 403 until it resets.

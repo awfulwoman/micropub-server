@@ -27,10 +27,13 @@ Built and tested:
   tells the server when the site build finished, so each post shows building, live or failed.
 - **A web UI** for writing, editing, deleting and sharing posts, uploading files, and seeing which
   apps have access.
+- **Link-target facts**: when a like, quote or bookmark is posted, the title, author and (for
+  tweets and toots) the oEmbed and original text of the linked page are saved in its front matter.
+  See [spec 06](docs/specs/06-post-templates.md#facts-about-the-link-target).
 - **A container image** (non-root, read-only filesystem) published to GHCR by CI, which smoke-tests
   the real image before pushing.
 
-Not built: fetching `like-of` targets' microformats
+Not built: attaching fetched h-entries as `references`
 (`enrich_post_data`), HEIC photos, and a live path preview in the forms. The infra role that
 deploys it lives in the infra repo.
 
