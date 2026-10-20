@@ -71,6 +71,24 @@ def _clean(value: Any, limit: int = MAX_TITLE_CHARS) -> str:
     return text if len(text) <= limit else text[: limit - 1].rstrip() + "…"
 
 
+_NOT_NAMES = {"admin", "administrator", "editor", "author", "user", "root", "webmaster", "staff"}
+
+
+def clean_author(value: Any) -> str:
+    """A person's or organisation's name, or "" for the IDs, URLs and placeholders sites put there."""
+    name = re.sub(r"^by\b:?\s*", "", _clean(value), flags=re.IGNORECASE)
+    lowered = name.lower()
+    if (
+        not name
+        or name.isdigit()
+        or lowered.startswith(("http://", "https://"))
+        or lowered in _NOT_NAMES
+        or lowered.startswith("admin_")
+    ):
+        return ""
+    return name
+
+
 def _strip_site(title: str, site: str) -> str:
     for sep in _SUFFIX_SEPARATORS:
         if site and title.endswith(sep + site):
@@ -151,16 +169,19 @@ def extract_page(html: str, url: str) -> TargetMeta:
         title = _clean(meta_tags.get("og:title")) or _clean(
             soup.title.get_text() if soup.title else ""
         )
-    if not author:
-        author = (
-            _clean(meta_tags.get("author"))
-            or (
-                _clean(meta_tags.get("article:author"))
-                if not meta_tags.get("article:author", "").startswith("http")
-                else ""
-            )
-            or _json_ld_author(soup)
-        )
+    # the first source that holds a real name: a placeholder in one must not hide the next
+    author = next(
+        filter(
+            None,
+            (
+                clean_author(author),
+                clean_author(meta_tags.get("author")),
+                clean_author(meta_tags.get("article:author")),
+                clean_author(_json_ld_author(soup)),
+            ),
+        ),
+        "",
+    )
     return TargetMeta(
         title=_strip_site(title, site),
         author=author,
@@ -227,7 +248,7 @@ def apply_oembed(meta: TargetMeta, data: dict[str, Any]) -> TargetMeta:
     text = meta.text or meta.entry_text or _embed_text(html)
     return TargetMeta(
         title=meta.title,
-        author=meta.author or _clean(data.get("author_name")),
+        author=meta.author or clean_author(data.get("author_name")),
         text=text,
         oembed=html,
         entry_text=meta.entry_text,

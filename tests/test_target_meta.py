@@ -196,3 +196,29 @@ async def test_a_redirect_into_a_private_address_is_refused(no_network):
         302, headers={"location": "http://127.0.0.1/secret"}
     )
     assert await fetch_target_meta("https://redir.example/", public_resolver) == TargetMeta()
+
+
+@pytest.mark.parametrize(
+    "raw, expected",
+    [
+        ("262588213843476", ""),
+        ("https://coderwall.com/jaymabazza", ""),
+        ("admin", ""),
+        ("admin_riojaweb", ""),
+        ("By: Editor", ""),
+        ("By Jeremy Keith", "Jeremy Keith"),
+        ("by: Ada L", "Ada L"),
+        ("Guardian Staff", "Guardian Staff"),
+        ("@mrmrs", "@mrmrs"),
+    ],
+)
+def test_author_values_that_are_not_names_are_dropped(raw, expected):
+    html = f'<html><head><title>T</title><meta name="author" content="{raw}"></head></html>'
+    assert extract_page(html, "https://x.example/").author == expected
+
+
+def test_a_placeholder_author_does_not_hide_a_real_one_further_down():
+    html = JSON_LD.replace(
+        "<title>T</title>", '<title>T</title><meta name="author" content="admin">'
+    )
+    assert extract_page(html, "https://x.example/").author == "Ada L"
