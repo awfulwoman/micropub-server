@@ -203,6 +203,9 @@ async def create_post(
 ) -> Created:
     jf2.pop("uid", None)  # never trust a client-chosen uid or slug
     jf2.pop("slug", None)
+    # A client may say which type it means (mp-post-type: note), so a titled note stays a note.
+    hint = to_list(jf2.pop("mp-post-type", None))
+    expect_type = expect_type or (str(hint[0]) if hint else None)
     if "mp-syndicate-to" in jf2:
         known = resolve_targets(s, jf2["mp-syndicate-to"])
         if known:
@@ -230,6 +233,12 @@ async def create_post(
         raise MicropubError(
             "not_implemented", f"No post type is configured for {post_type} posts", 501
         )
+    if (
+        expect_type
+        and post_type != expect_type
+        and discover_post_type(s.post_types, _untitled(props)) == expect_type
+    ):
+        post_type, cfg = expect_type, s.post_types.get(expect_type)  # a note with a title
     if expect_type and post_type != expect_type:
         raise MicropubError(
             "invalid_request",
@@ -331,6 +340,47 @@ def _comparable(props: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _untitled(props: dict[str, Any]) -> dict[str, Any]:
+    """Props without the title: on this site a title alone never makes a note an article."""
+    return {k: v for k, v in props.items() if k != "name"}
+
+
+async def _with_file_front_matter(s: AppState, row, old: dict[str, Any]) -> dict[str, Any]:
+    """The post as the database has it, plus anything added to its file outside the server.
+
+    A hand edit or a script (a URL migration, a backfill) can add a title, aliases or a guid to the
+    file without the database knowing. The next save renders from the database, so without this
+    those keys would be lost. The database wins where both have a value; aliases are combined.
+    """
+    from .importer import _front_matter_to_jf2, _split
+
+    cfg = s.post_types.get(row["post_type"])
+    try:
+        if cfg is None or not await s.store.exists(row["path"]):
+            return old
+        front, body = _split((await s.store.read(row["path"])).decode())
+        from_file, extras = _front_matter_to_jf2(front, body, row["post_type"], cfg, row["path"])
+    except Exception:  # an unreadable file: carry on with what the database has
+        return old
+    merged = {**from_file, **old}
+    ours = old.get("front-matter") if isinstance(old.get("front-matter"), dict) else {}
+    kept = {**extras, **ours}
+    aliases = [*to_list(extras.get("aliases")), *to_list(ours.get("aliases"))]
+    if aliases:
+        kept["aliases"] = list(dict.fromkeys(aliases))
+    if kept:
+        merged["front-matter"] = kept
+    return merged
+
+
+def _add_alias(props: dict[str, Any], url: str) -> None:
+    extras = props.get("front-matter")
+    if not isinstance(extras, dict):
+        extras = props["front-matter"] = {}
+    path = urlsplit(url).path
+    extras["aliases"] = list(dict.fromkeys([*to_list(extras.get("aliases")), path]))
+
+
 async def update_post(
     s: AppState,
     url: str,
@@ -349,6 +399,7 @@ async def update_post(
             "insufficient_scope", "The update scope is required", 403, scope="update"
         )
 
+    old = await _with_file_front_matter(s, row, old)
     try:
         edited = apply_update(old, add=add, replace=replace, delete=delete)
     except UpdateError as exc:
@@ -367,10 +418,12 @@ async def update_post(
     )
     # An edit only changes a post's type if it changes what discovery says about it. Otherwise a
     # note with a title (which discovery calls an article) would jump sections on its first edit.
+    # A title alone never counts: on this site notes may have titles too.
     discovered = discover_post_type(s.post_types, props)
-    post_type = (
-        discovered if discovered != discover_post_type(s.post_types, old) else row["post_type"]
+    changed = discover_post_type(s.post_types, _untitled(props)) != discover_post_type(
+        s.post_types, _untitled(old)
     )
+    post_type = discovered if changed else row["post_type"]
     cfg = s.post_types.get(post_type)
     if cfg is None:
         raise MicropubError(
@@ -411,6 +464,8 @@ async def update_post(
     else:
         new_path, new_url = old_path, old_url
     moved = new_path != old_path
+    if new_url != old_url and props.get("post-status") != "draft":
+        _add_alias(props, old_url)  # links to the old address keep working
 
     props["url"] = new_url
     props["updated"] = (

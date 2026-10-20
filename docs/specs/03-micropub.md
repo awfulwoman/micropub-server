@@ -115,9 +115,15 @@ JSON only (form-encoded updates are rejected with 400). Body, following the Micr
 - `uid`, `url`, `post-type` and `type` cannot be changed by a client.
 - **A slug is fixed once chosen.** Editing a title does not move the post. Only `mp-slug` in
   an update changes the slug, and that moves the post.
-- **A type is fixed unless the edit changes what discovery says.** Adding a photo to a note
-  makes it a photo post and moves it. Editing the text of a titled note imported from the site
-  does not turn it into an article.
+- **A type is fixed unless the edit changes what discovery says, leaving the title out.**
+  Adding a photo to a note makes it a photo post and moves it. Adding, changing or removing a
+  title never does: on this site notes may have titles, so a title alone never turns a note
+  into an article or back.
+- **Front matter added to the file outside the server is kept.** Before applying the edit,
+  the current file is read and any key it has that the database lacks (a title, `aliases`, a
+  `guid` added by hand or by a script) is added to the post. The database wins where both have
+  a value; aliases are combined. Without this, the next save would render from the stale
+  database copy and drop them (this happened on 2026-10-20, see the commit history).
 - The `channel` is kept unless `mp-channel` is given.
 - `post-status` can be replaced (`draft` to `published` publishes a draft).
 - The post is rendered again. If the file would be identical and nothing about its place
@@ -127,7 +133,8 @@ JSON only (form-encoded updates are rejected with 400). Body, following the Micr
 - Otherwise `updated` is set and the file is committed. If the **slug, publication time or
   type** changed, the post moves (path and URL are rendered again, with `-2`, `-3` ... if
   taken). A page bundle moves together with its photos, in the same commit. A move returns
-  `201` with the new `Location`; an in-place edit returns `200`.
+  `201` with the new `Location`; an in-place edit returns `200`. A published post that moves
+  keeps its old URL path in `aliases`, so links to it still work.
 - With the `draft` scope only posts that are drafts can be edited, and they stay drafts.
   Anything else is `403 insufficient_scope`.
 - Unknown URL: `400 invalid_request`. A deleted post cannot be updated.

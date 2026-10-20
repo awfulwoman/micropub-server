@@ -35,6 +35,9 @@ def test_alias_follows_a_title_slug_change(client, bearer, site, state):
         headers=bearer,
     )
     assert r.status_code in (200, 201, 204), r.text
-    assert front(site, "content/posts/2026/renamed/index.md")["aliases"] == [
-        "/posts/2026/10/14/renamed/"
-    ]
+    # the new dated alias, and both old addresses still redirect to the post
+    assert set(front(site, "content/posts/2026/renamed/index.md")["aliases"]) == {
+        "/posts/2026/10/14/renamed/",
+        "/posts/2026/10/14/hello-there/",
+        "/posts/hello-there/",
+    }

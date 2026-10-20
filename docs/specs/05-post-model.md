@@ -66,6 +66,11 @@ in this order:
    Pages need this. A page is a `name` and `content`, which would otherwise
    be an article. Checkins use `discovery_first`, so a checkin with a photo
    (common from OwnYourSwarm) stays a checkin.
+
+   A client can also name the type with `mp-post-type` (a server command,
+   never saved), and the web UI does so for the form it shows. If the post
+   only differs from that type by having a title, the named type wins: that is
+   how a titled note stays a note. Any other mismatch is refused with `422`.
 1. `type == "event"`: **event**.
 2. A configured post type whose `h` value is not `entry` and equals `type`.
    This is for custom vocabularies.
@@ -88,7 +93,8 @@ in this order:
 5. Has `name` **and** content (or `summary`): **article**. This departs from
    the PTD spec, which compares `name` with the start of the content. The
    departure is deliberate, so a long note with an accidental `name` is still
-   an article.
+   an article. A client that means a titled note sends `mp-post-type: note`
+   (step 0), and an edit never changes the type by title alone (see 03).
 6. Otherwise: **note**.
 
 The chosen type is saved as `post-type` but never written to front matter.
