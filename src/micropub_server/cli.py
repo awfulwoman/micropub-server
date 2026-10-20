@@ -86,8 +86,12 @@ def _import(args) -> int:
         print(f"config error: {exc}", file=sys.stderr)
         return 1
     source = FileSystemStore(args.source) if args.source else state.store
-    asyncio.run(state.refresh_site_config())
-    report = asyncio.run(import_posts(state, source, dry_run=args.dry_run, only_type=args.type))
+
+    async def run():  # one loop: the store's HTTP client cannot outlive the loop it was used in
+        await state.refresh_site_config()
+        return await import_posts(state, source, dry_run=args.dry_run, only_type=args.type)
+
+    report = asyncio.run(run())
     verb = "would import" if args.dry_run else "imported"
     print(
         f"{verb} {report.imported}, unchanged {report.unchanged}, skipped {report.skipped}, failed {report.failed}"
@@ -101,7 +105,7 @@ def _import(args) -> int:
     if args.check_urls and not args.dry_run:
         from .importer import check_urls
 
-        bad = asyncio.run(check_urls(state))
+        bad = asyncio.run(check_urls(state))  # a fresh loop is fine: it uses its own clients
         print(f"checked the live site: {len(bad)} imported URLs are not served")
         for url, status in bad:
             print(f"  {status or 'error'} {url}", file=sys.stderr)
@@ -118,8 +122,12 @@ def _backfill_targets(args) -> int:
     except ConfigError as exc:
         print(f"config error: {exc}", file=sys.stderr)
         return 1
-    asyncio.run(state.refresh_site_config())
-    report = asyncio.run(backfill_targets(state, dry_run=args.dry_run, delay=args.delay))
+
+    async def run():
+        await state.refresh_site_config()
+        return await backfill_targets(state, dry_run=args.dry_run, delay=args.delay)
+
+    report = asyncio.run(run())
     verb = "would update" if args.dry_run else "updated"
     print(
         f"{verb} {report.updated}, already done {report.skipped}, "
