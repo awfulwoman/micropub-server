@@ -677,6 +677,25 @@ async def share_now(request: Request, session: dict[str, Any]) -> Response:
     return _back(row["uid"], note)
 
 
+@signed_in
+async def remove_copy(request: Request, session: dict[str, Any]) -> Response:
+    s = state_of(request)
+    row = await _load(request)
+    if row is None:
+        return Response("No such post", status_code=404)
+    form = await request.form()
+    if not ui.csrf_ok(session, form.get("csrf")):
+        return Response("Invalid form token", status_code=403)
+    copy = str(form.get("url") or "")
+    if row["deleted"] or copy not in (json.loads(row["properties"]).get("syndication") or []):
+        return _back(row["uid"], "Nothing changed.")
+    try:
+        await update_post(s, row["url"], delete={"syndication": [copy]})
+    except MicropubError as exc:
+        return _back(row["uid"], exc.description)
+    return _back(row["uid"], f"Removed {copy}.")
+
+
 def routes() -> list:
     return [
         Route("/", home),
@@ -696,5 +715,6 @@ def routes() -> list:
         Route("/posts/{uid}/undelete", undelete_form, methods=["GET"]),
         Route("/posts/{uid}/undelete", undelete_submit, methods=["POST"]),
         Route("/posts/{uid}/syndicate", share_now, methods=["POST"]),
+        Route("/posts/{uid}/syndication/remove", remove_copy, methods=["POST"]),
         Mount("/static", StaticFiles(packages=[("micropub_server", "static")]), name="static"),
     ]

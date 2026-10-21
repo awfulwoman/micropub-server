@@ -10,7 +10,7 @@ from .conftest import sign_in
 
 FILES = {
     # modern note: +0100 date without a colon, a title, tags
-    "content/notes/2025/02/11/1855.md": '---\ntitle: An ode to ZFS\ndate: "2025-02-11T18:55:20+0100"\ntags:\n  - zfs\n---\n\nA disk is dying.\n',
+    "content/notes/2025/02/11/1855.md": '---\ntitle: An ode to ZFS\ndate: "2025-02-11T18:55:20+0100"\ntags:\n  - zfs\nsyndication:\n  - https://m.example/1\n---\n\nA disk is dying.\n',
     # old layout: bundle with an image next to it
     "content/notes/2018/3289/index.md": "---\ndate: '2018-05-01T10:00:00.000Z'\nimages:\n  - file: a.jpg\n    alt: A boat\n---\nBoats!\n",
     "content/notes/2018/3289/a.jpg": "JPEGDATA",
@@ -115,6 +115,7 @@ async def test_properties_are_reversed_from_front_matter(populated):
     await run(populated)
     p = json.loads(posts(populated)["content/notes/2025/02/11/1855.md"]["properties"])
     assert p["name"] == "An ode to ZFS" and p["category"] == ["zfs"]
+    assert p["syndication"] == ["https://m.example/1"] and "front-matter" not in p
     assert p["published"] == "2025-02-11T18:55:20+01:00"
     assert p["content"]["text"] == "A disk is dying." and "<p>" in p["content"]["html"]
     assert p["post-type"] == "note" and p["post-status"] == "published" and p["type"] == "entry"

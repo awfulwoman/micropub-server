@@ -1,8 +1,10 @@
+import asyncio
 import re
 
 import pytest
 from ruamel.yaml import YAML
 
+from micropub_server.publish import update_post
 from micropub_server.syndication.mastodon import MastodonTarget
 
 from .conftest import PASSWORD, jpeg_bytes
@@ -251,6 +253,40 @@ def test_share_now(ui, state, site, no_network):
     assert fm(site, NOTE)[0]["syndication"] == [f"{API}/@awfulwoman/5"]
     assert f"{API}/@awfulwoman/5" in ui.get(post).text
     assert "Share now" not in ui.get(post).text
+
+
+def _with_copies(ui, state, *copies):
+    post = make(ui, content="x")
+    url = state.db.query("SELECT url FROM posts WHERE uid = ?", (post.split("/")[-1],))[0]["url"]
+    asyncio.run(update_post(state, url, add={"syndication": list(copies)}))
+    return post
+
+
+def test_removing_a_copy(ui, state, site):
+    post = _with_copies(ui, state, f"{API}/@awfulwoman/5", "https://bsky.app/x")
+    html = ui.get(post).text
+    assert f'action="{post}/syndication/remove"' in html
+    r = ui.post(
+        f"{post}/syndication/remove", data={"csrf": csrf(ui, post), "url": f"{API}/@awfulwoman/5"}
+    )
+    assert r.status_code == 303 and "Removed" in r.headers["location"]
+    assert fm(site, NOTE)[0]["syndication"] == ["https://bsky.app/x"]
+    assert f"{API}/@awfulwoman/5" not in ui.get(post).text
+
+
+def test_removing_the_last_copy_drops_the_property(ui, state, site):
+    post = _with_copies(ui, state, f"{API}/@awfulwoman/5")
+    ui.post(
+        f"{post}/syndication/remove", data={"csrf": csrf(ui, post), "url": f"{API}/@awfulwoman/5"}
+    )
+    assert "syndication" not in fm(site, NOTE)[0]
+    assert "Also published at" not in ui.get(post).text
+
+
+def test_removing_a_copy_needs_csrf(ui, state, site):
+    post = _with_copies(ui, state, f"{API}/@awfulwoman/5")
+    r = ui.post(f"{post}/syndication/remove", data={"csrf": "wrong", "url": f"{API}/@awfulwoman/5"})
+    assert r.status_code == 403 and fm(site, NOTE)[0]["syndication"] == [f"{API}/@awfulwoman/5"]
 
 
 def test_share_now_needs_csrf(ui, state):

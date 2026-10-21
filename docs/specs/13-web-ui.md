@@ -55,6 +55,7 @@ Indiekit's equivalents are `endpoint-posts` (`/posts`), `endpoint-share`
 | `GET, POST /posts/{uid}/delete` | Confirm, then delete |
 | `GET, POST /posts/{uid}/undelete` | Confirm, then undelete |
 | `POST /posts/{uid}/syndicate` | Run syndication for this post now |
+| `POST /posts/{uid}/syndication/remove` | Remove one "also published at" link (form field `url`) from the post |
 | `GET /share` | Bookmarklet target: the bookmark form, filled in |
 | `GET /files` | Uploaded media list |
 | `GET /files/upload`, `POST /files/upload` | Upload on its own, then copy the URL |

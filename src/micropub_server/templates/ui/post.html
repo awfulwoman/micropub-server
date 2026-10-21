@@ -35,7 +35,22 @@
 <dl class="props">
   {% for key, value in details %}<dt>{{ key }}</dt><dd>{{ value }}</dd>{% endfor %}
 </dl>
-{% if copies %}<h2>Also published at</h2><ul>{% for c in copies %}<li><a href="{{ c }}">{{ c }}</a></li>{% endfor %}</ul>{% endif %}
+{% if copies %}
+<h2>Also published at</h2>
+<ul class="copies">
+  {% for c in copies %}
+  <li>
+    <a href="{{ c }}">{{ c }}</a>
+    {% if not deleted %}
+    <form method="post" action="/posts/{{ row.uid }}/syndication/remove">
+      <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="url" value="{{ c }}">
+      <button type="submit" class="danger" aria-label="Remove {{ c }}">Remove</button>
+    </form>
+    {% endif %}
+  </li>
+  {% endfor %}
+</ul>
+{% endif %}
 
 <h2>File</h2>
 <p class="muted"><code>{{ row.path }}</code></p>
