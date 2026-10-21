@@ -265,7 +265,12 @@ def _with_copies(ui, state, *copies):
 def test_removing_a_copy(ui, state, site):
     post = _with_copies(ui, state, f"{API}/@awfulwoman/5", "https://bsky.app/x")
     html = ui.get(post).text
-    assert f'action="{post}/syndication/remove"' in html
+    confirm = f"{post}/syndication/remove?url=https%3A//indieweb.social/%40awfulwoman/5"
+    assert f'href="{confirm}"' in html and 'method="post"' not in html.split("Also published at")[1]
+    page = ui.get(confirm)
+    assert page.status_code == 200 and "Remove this link?" in page.text
+    assert f'name="url" value="{API}/@awfulwoman/5"' in page.text
+    assert fm(site, NOTE)[0]["syndication"] == [f"{API}/@awfulwoman/5", "https://bsky.app/x"]
     r = ui.post(
         f"{post}/syndication/remove", data={"csrf": csrf(ui, post), "url": f"{API}/@awfulwoman/5"}
     )
@@ -281,6 +286,12 @@ def test_removing_the_last_copy_drops_the_property(ui, state, site):
     )
     assert "syndication" not in fm(site, NOTE)[0]
     assert "Also published at" not in ui.get(post).text
+
+
+def test_confirming_an_unknown_copy_goes_back(ui, state):
+    post = _with_copies(ui, state, f"{API}/@awfulwoman/5")
+    r = ui.get(f"{post}/syndication/remove?url=https://elsewhere.example/1")
+    assert r.status_code == 303 and r.headers["location"].startswith(post)
 
 
 def test_removing_a_copy_needs_csrf(ui, state, site):

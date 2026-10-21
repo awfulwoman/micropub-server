@@ -578,8 +578,9 @@ async def edit_submit(request: Request, session: dict[str, Any]) -> Response:
 
 
 async def _confirm(
-    request, session, *, action: str, heading: str, question: str, button: str, danger: bool
-):
+    request, session, *, action: str, heading: str, question: str, button: str, danger: bool,
+    subject: str | None = None, fields: dict[str, str] | None = None,
+):  # fmt: skip
     row = await _load(request)
     if row is None:
         return None, Response("No such post", status_code=404)
@@ -593,7 +594,8 @@ async def _confirm(
         "ui/confirm.html",
         row=row,
         title=_title(props, props.get("slug") or row["url"]),
-        subject=row["url"],
+        subject=subject or row["url"],
+        fields=fields or {},
         cancel_url=f"/posts/{row['uid']}",
         heading=heading,
         question=question,
@@ -678,6 +680,22 @@ async def share_now(request: Request, session: dict[str, Any]) -> Response:
 
 
 @signed_in
+async def remove_copy_form(request: Request, session: dict[str, Any]) -> Response:
+    copy = request.query_params.get("url", "")
+    row = await _load(request)
+    if row is None:
+        return Response("No such post", status_code=404)
+    if row["deleted"] or copy not in (json.loads(row["properties"]).get("syndication") or []):
+        return _back(row["uid"], "Nothing changed.")
+    row, response = await _confirm(
+        request, session, action="syndication/remove", heading="Remove this link?", button="Remove",
+        danger=True, subject=copy, fields={"url": copy},
+        question="The post stops saying it was also published here. The copy itself is not deleted.",
+    )  # fmt: skip
+    return response
+
+
+@signed_in
 async def remove_copy(request: Request, session: dict[str, Any]) -> Response:
     s = state_of(request)
     row = await _load(request)
@@ -715,6 +733,7 @@ def routes() -> list:
         Route("/posts/{uid}/undelete", undelete_form, methods=["GET"]),
         Route("/posts/{uid}/undelete", undelete_submit, methods=["POST"]),
         Route("/posts/{uid}/syndicate", share_now, methods=["POST"]),
+        Route("/posts/{uid}/syndication/remove", remove_copy_form, methods=["GET"]),
         Route("/posts/{uid}/syndication/remove", remove_copy, methods=["POST"]),
         Mount("/static", StaticFiles(packages=[("micropub_server", "static")]), name="static"),
     ]

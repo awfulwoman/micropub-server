@@ -73,8 +73,7 @@ dl.props dt { font-weight: 600; }
 dl.props dd { margin: 0; overflow-wrap: anywhere; }
 ul.copies li { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; margin-bottom: .25rem; }
 ul.copies a { overflow-wrap: anywhere; }
-ul.copies form { display: inline; }
-ul.copies button { padding: .2rem .6rem; font-size: .875em; }
+ul.copies .button { padding: .2rem .6rem; font-size: .875em; }
 .photo-slot { border: 1px dashed var(--line); border-radius: 6px; padding: .5rem; margin: .5rem 0; }
 .photo-slot img { max-height: 8rem; display: block; margin-bottom: .5rem; }
 .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr)); gap: .75rem; list-style: none; padding: 0; }
