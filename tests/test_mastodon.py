@@ -44,23 +44,35 @@ def test_links_are_kept_with_their_text():
     assert "this post https://example.com/a" in build_status(props, limit=500)
 
 
-def test_article_is_its_title_the_first_paragraph_and_the_permalink():
-    props = {
-        "url": PERMALINK,
-        "name": "Planning Security",
-        "content": {"text": "x", "html": "<p>First para.</p><p>Second para.</p>"},
-    }
-    assert build_status(props, limit=500) == f"Planning Security\n\nFirst para.\n\n{PERMALINK}"
-
-
-def test_article_prefers_its_summary_over_the_body():
+def test_titled_post_that_fits_is_shared_in_full_without_its_title():
     props = {
         "url": PERMALINK,
         "name": "Planning Security",
         "summary": "A short pitch.",
-        "content": {"text": "x", "html": "<p>First para.</p>"},
+        "content": {"text": "x", "html": "<p>First para.</p><p>Second para.</p>"},
     }
-    assert build_status(props, limit=500) == f"Planning Security\n\nA short pitch.\n\n{PERMALINK}"
+    assert build_status(props, limit=500) == f"First para.\n\nSecond para.\n\n{PERMALINK}"
+
+
+def test_long_article_is_its_summary_without_its_title():
+    long = " ".join(["word"] * 200)
+    props = {
+        "url": PERMALINK,
+        "name": "Planning Security",
+        "summary": "A short pitch.",
+        "content": {"text": "x", "html": f"<p>{long}</p>"},
+    }
+    assert build_status(props, limit=500) == f"A short pitch.\n\n{PERMALINK}"
+
+
+def test_long_article_without_a_summary_is_its_first_paragraph():
+    long = " ".join(["word"] * 200)
+    props = {
+        "url": PERMALINK,
+        "name": "Planning Security",
+        "content": {"text": "x", "html": f"<p>First para.</p><p>{long}</p>"},
+    }
+    assert build_status(props, limit=500) == f"First para.\n\n{PERMALINK}"
 
 
 def test_article_without_a_summary_or_body_is_title_and_permalink():
@@ -68,13 +80,13 @@ def test_article_without_a_summary_or_body_is_title_and_permalink():
     assert build_status(props, limit=500) == f"Planning Security\n\n{PERMALINK}"
 
 
-def test_article_excerpt_is_cut_to_fit_and_the_title_is_kept():
+def test_article_excerpt_is_cut_to_fit():
     long = " ".join(["word"] * 200)
     out = build_status({"url": PERMALINK, "name": "Title", "summary": long}, limit=200)
-    assert out.startswith("Title\n\n") and out.endswith(PERMALINK)
-    excerpt = out.split("\n\n")[1]
+    excerpt, link = out.rsplit("\n\n", 1)
+    assert link == PERMALINK and "Title" not in excerpt
     assert excerpt.endswith("…")
-    assert len("Title\n\n" + excerpt) + 2 + 23 <= 200
+    assert len(excerpt) + 2 + 23 <= 200
 
 
 def test_long_text_is_cut_at_a_word_to_leave_room_for_the_link():
