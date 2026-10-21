@@ -49,6 +49,18 @@ def test_defaults(tmp_path):
     assert "uid" in cfg.template.omit
 
 
+def test_sharing_targets_are_unticked_by_default(tmp_path):
+    f = tmp_path / "config.yaml"
+    f.write_text(
+        "store:\n  type: filesystem\n  directory: /tmp/x\n"
+        "syndication:\n  mastodon:\n    url: https://m.example\n    user: me\n"
+        "  bluesky:\n    handle: me.bsky.social\n"
+    )
+    cfg = load_config(f)
+    assert cfg.syndication.mastodon.checked is False
+    assert cfg.syndication.bluesky.checked is False
+
+
 def test_unknown_key_rejected(tmp_path):
     f = tmp_path / "config.yaml"
     f.write_text("store:\n  type: filesystem\n  directory: /x\nbogus: 1\n")

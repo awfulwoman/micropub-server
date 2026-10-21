@@ -128,7 +128,7 @@ class Channel(_Model):
 class MastodonConfig(_Model):
     url: str
     user: str
-    checked: bool = True
+    checked: bool = False
     character_limit: int = 500
     include_permalink: bool = True
     visibility: Literal["public", "unlisted", "private"] = "public"

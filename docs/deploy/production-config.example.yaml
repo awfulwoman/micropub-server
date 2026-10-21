@@ -37,7 +37,7 @@ syndication:
   mastodon:
     url: https://indieweb.social
     user: awfulwoman
-    checked: true
+    checked: false
   # bluesky:
   #   handle: awfulwoman.com
   #   checked: false

@@ -167,7 +167,7 @@ syndication:
   mastodon:
     url: https://indieweb.social
     user: awfulwoman
-    checked: true               # ticked by default in clients
+    checked: false              # true ticks it by default in clients
     character_limit: 500
     include_permalink: true
     visibility: public          # public | unlisted | private
