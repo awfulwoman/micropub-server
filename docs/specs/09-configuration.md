@@ -119,7 +119,8 @@ post_types:
     required_properties: [bookmark-of]
   photo:
     name: Photo
-    discovery_without: [content]   # a photo with words is a note
+    discovery_without: [content]   # a photo with words is a note, titled or not
+    discovery_without_type: note
     post:
       path: content/photos/{yyyy}/{MM}/{dd}/{slug}/index.md
       url: photos/{yyyy}/{MM}/{dd}/{slug}/

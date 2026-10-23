@@ -112,8 +112,10 @@ class PostType(_Model):
     discovery: str | None = None
     discovery_first: bool = False
     # Properties that stop discovery from choosing this type, so the post falls through to
-    # later rules. A photo with `content` this way becomes a note.
+    # later rules. If no other property rule matches, it becomes discovery_without_type (when
+    # set): with [content] and "note", a photo with words is a note, titled or not.
     discovery_without: list[str] = Field(default_factory=list)
+    discovery_without_type: str | None = None
     channel: str | None = None
     # How the importer derives {slug} for existing files that have no slug in their front matter:
     # "path" uses the file or folder name; "title" slugifies the title, as Hugo's :slug permalink does.

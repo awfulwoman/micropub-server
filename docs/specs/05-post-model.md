@@ -91,10 +91,11 @@ in this order:
    decided on 2026-10-14. Use `discovery_first` (step 0) for exceptions.
 
    A type with `discovery_without` is skipped when any of those properties is
-   present, and the post falls through to the next rule. This site sets
-   `discovery_without: [content]` on photo, so a photo with words is a note
-   (or an article, if it has a title), and only a bare photo is a photo.
-   Decided on 2026-10-23.
+   present, and the post falls through to the remaining property rules. If none
+   matches and the type sets `discovery_without_type`, the post is that type,
+   before steps 4–6. This site sets `discovery_without: [content]` and
+   `discovery_without_type: note` on photo, so a photo with words is a note,
+   titled or not, and only a bare photo is a photo. Decided on 2026-10-23.
 4. `children` is a non-empty list: **collection**.
 5. Has `name` **and** content (or `summary`): **article**. This departs from
    the PTD spec, which compares `name` with the start of the content. The

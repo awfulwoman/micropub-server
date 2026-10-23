@@ -28,7 +28,7 @@ TYPES = {
     "checkin": pt(discovery="checkin", discovery_first=True),
     "page": pt(channel="pages"),
     "quote": pt(discovery="quotation-of"),
-    "photo": pt(discovery_without=["content"]),
+    "photo": pt(discovery_without=["content"], discovery_without_type="note"),
 }
 
 
@@ -51,10 +51,12 @@ TYPES = {
         # discovery_first: a checkin with a photo stays a checkin
         ({"checkin": {"type": "card"}, "photo": [{"url": "/a.jpg"}]}, "checkin"),
         ({"type": "event"}, "event"),
-        # discovery_without: a photo with words is a note (or an article, if titled)
+        # discovery_without(_type): a photo with words is a note, titled or not
         ({"photo": [{"url": "/a.jpg"}], "content": "hi"}, "note"),
-        ({"photo": [{"url": "/a.jpg"}], "name": "T", "content": "hi"}, "article"),
+        ({"photo": [{"url": "/a.jpg"}], "name": "T", "content": "hi"}, "note"),
         ({"photo": [{"url": "/a.jpg"}], "name": "T"}, "photo"),
+        # a later property rule still wins over discovery_without_type
+        ({"photo": [{"url": "/a.jpg"}], "content": "hi", "bookmark-of": "https://x"}, "bookmark"),
     ],
 )
 def test_discover(props, expected):

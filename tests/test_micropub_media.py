@@ -134,8 +134,10 @@ def test_non_bundle_photo_type_uses_static_media(client, bearer, site, state):
 
 def test_photo_with_words_is_a_note_bundle_when_photo_says_so(client, bearer, site, state):
     state.config.post_types["photo"].discovery_without = ["content"]
+    state.config.post_types["photo"].discovery_without_type = "note"
     state.config.post_types["note"].post.path = "content/notes/{yyyy}/{MM}/{dd}/{HH}{mm}/index.md"
-    r = post_photo(client, bearer, data={"content": "Boats!", "mp-photo-alt": "A boat"})
+    data = {"name": "Boats", "content": "Boats!", "mp-photo-alt": "A boat"}
+    r = post_photo(client, bearer, data=data)
     assert r.status_code == 202, r.text
     assert r.headers["location"] == "https://awfulwoman.com/notes/2026/10/14/1910/"
     assert (site / "content/notes/2026/10/14/1910/boat.jpg").is_file()

@@ -223,10 +223,17 @@ def discover_post_type(types: dict[str, PostType], props: dict[str, Any]) -> str
     for name, cfg in types.items():
         if cfg.discovery:
             table[name] = cfg.discovery
+    instead = None
     for name, prop in table.items():
+        if prop not in props:
+            continue
         cfg = types.get(name)
-        if prop in props and not (cfg and any(p in props for p in cfg.discovery_without)):
-            return name
+        if cfg and any(p in props for p in cfg.discovery_without):
+            instead = instead or cfg.discovery_without_type
+            continue
+        return name
+    if instead:
+        return instead
 
     if props.get("children"):
         return "collection"
