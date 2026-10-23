@@ -28,6 +28,7 @@ TYPES = {
     "checkin": pt(discovery="checkin", discovery_first=True),
     "page": pt(channel="pages"),
     "quote": pt(discovery="quotation-of"),
+    "photo": pt(discovery_without=["content"]),
 }
 
 
@@ -50,6 +51,10 @@ TYPES = {
         # discovery_first: a checkin with a photo stays a checkin
         ({"checkin": {"type": "card"}, "photo": [{"url": "/a.jpg"}]}, "checkin"),
         ({"type": "event"}, "event"),
+        # discovery_without: a photo with words is a note (or an article, if titled)
+        ({"photo": [{"url": "/a.jpg"}], "content": "hi"}, "note"),
+        ({"photo": [{"url": "/a.jpg"}], "name": "T", "content": "hi"}, "article"),
+        ({"photo": [{"url": "/a.jpg"}], "name": "T"}, "photo"),
     ],
 )
 def test_discover(props, expected):

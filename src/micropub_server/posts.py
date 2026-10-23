@@ -224,7 +224,8 @@ def discover_post_type(types: dict[str, PostType], props: dict[str, Any]) -> str
         if cfg.discovery:
             table[name] = cfg.discovery
     for name, prop in table.items():
-        if prop in props:
+        cfg = types.get(name)
+        if prop in props and not (cfg and any(p in props for p in cfg.discovery_without)):
             return name
 
     if props.get("children"):

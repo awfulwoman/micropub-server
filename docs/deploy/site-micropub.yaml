@@ -32,7 +32,7 @@ post_types:
   note:
     name: Note
     post:
-      path: content/notes/{yyyy}/{MM}/{dd}/{slug}.md
+      path: content/notes/{yyyy}/{MM}/{dd}/{slug}/index.md
       url: notes/{yyyy}/{MM}/{dd}/{slug}/
     properties:
       - content
@@ -114,13 +114,14 @@ post_types:
       - content
   photo:
     name: Photo
+    discovery_without:  # a photo with words is a note
+      - content
     post:
       path: content/photos/{yyyy}/{MM}/{dd}/{slug}/index.md
       url: photos/{yyyy}/{MM}/{dd}/{slug}/
     properties:
       - photo
       - name
-      - content
       - category
       - location
     required_properties:

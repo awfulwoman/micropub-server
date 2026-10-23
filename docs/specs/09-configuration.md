@@ -96,7 +96,7 @@ post_types:
   note:
     name: Note
     post:
-      path: content/notes/{yyyy}/{MM}/{dd}/{slug}.md
+      path: content/notes/{yyyy}/{MM}/{dd}/{slug}/index.md
       url: notes/{yyyy}/{MM}/{dd}/{slug}/
     properties: [content, category, location, photo]
     required_properties: [content]
@@ -119,12 +119,13 @@ post_types:
     required_properties: [bookmark-of]
   photo:
     name: Photo
+    discovery_without: [content]   # a photo with words is a note
     post:
       path: content/photos/{yyyy}/{MM}/{dd}/{slug}/index.md
       url: photos/{yyyy}/{MM}/{dd}/{slug}/
     media:
       path: content/photos/{yyyy}/{MM}/{dd}/{slug}/{filename}
-    properties: [photo, name, content, category, location]
+    properties: [photo, name, category, location]
     required_properties: [photo]
   quote:
     name: Quote

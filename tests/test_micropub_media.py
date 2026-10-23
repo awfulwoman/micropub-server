@@ -132,6 +132,22 @@ def test_non_bundle_photo_type_uses_static_media(client, bearer, site, state):
     assert fm["images"] == [{"file": stored.name}]
 
 
+def test_photo_with_words_is_a_note_bundle_when_photo_says_so(client, bearer, site, state):
+    state.config.post_types["photo"].discovery_without = ["content"]
+    state.config.post_types["note"].post.path = "content/notes/{yyyy}/{MM}/{dd}/{HH}{mm}/index.md"
+    r = post_photo(client, bearer, data={"content": "Boats!", "mp-photo-alt": "A boat"})
+    assert r.status_code == 202, r.text
+    assert r.headers["location"] == "https://awfulwoman.com/notes/2026/10/14/1910/"
+    assert (site / "content/notes/2026/10/14/1910/boat.jpg").is_file()
+    fm = front_matter(site, "content/notes/2026/10/14/1910/index.md")
+    assert fm["images"] == [{"file": "boat.jpg", "alt": "A boat"}]
+    assert (
+        post_photo(client, bearer, data={"name": "Bare"})
+        .headers["location"]
+        .startswith("https://awfulwoman.com/photos/")
+    )
+
+
 # --- media uploaded earlier through /media ---------------------------------------------
 def upload(client, bearer, color=(5, 5, 5), name="canal.jpg"):
     r = client.post(
