@@ -1,6 +1,12 @@
 from ruamel.yaml import YAML
 
-from micropub_server.topics import add_topics, load_topic_map, tags_of, topics_for_tags
+from micropub_server.topics import (
+    add_topics,
+    load_topic_map,
+    parse_suggestion,
+    tags_of,
+    topics_for_tags,
+)
 
 MAP = load_topic_map(
     {
@@ -70,3 +76,14 @@ def test_add_topics_never_overwrites_and_needs_front_matter():
     assert add_topics("---\ntopics: [web]\n---\n", ["life"]) is None
     assert add_topics(POST, []) is None
     assert add_topics("no front matter", ["web"]) is None
+
+
+def test_parse_suggestion_reads_a_json_list_and_keeps_known_topics_only():
+    assert parse_suggestion('["lgbtq", "web"]', MAP) == ["lgbtq", "web"]
+    assert parse_suggestion('Sure! ["Life", "nope", "life"]', MAP) == ["life"]
+
+
+def test_parse_suggestion_caps_at_three_and_accepts_none():
+    assert parse_suggestion('["web", "tech", "lgbtq", "life"]', MAP) == ["web", "tech", "lgbtq"]
+    assert parse_suggestion("[]", MAP) == []
+    assert parse_suggestion("no idea", MAP) == []

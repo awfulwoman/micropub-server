@@ -6,6 +6,7 @@ matching tags, with the order of the map breaking ties.
 
 from __future__ import annotations
 
+import json
 import re
 from collections import Counter
 
@@ -32,6 +33,21 @@ def topics_for_tags(tags: list[str], topic_map: dict[str, list[str]]) -> list[st
     counts = Counter({k: len(wanted.intersection(v)) for k, v in topic_map.items()})
     hits = [k for k in order if counts[k]]
     return sorted(hits, key=lambda k: (-counts[k], order.index(k)))[:MAX_TOPICS]
+
+
+def parse_suggestion(reply: str, topic_map: dict[str, list[str]]) -> list[str]:
+    """Topic keys from an LLM reply holding a JSON list: known keys only, no repeats, at most three."""
+    match = re.search(r"\[.*?\]", reply, re.S)
+    try:
+        values = json.loads(match.group(0)) if match else []
+    except ValueError:
+        return []
+    out: list[str] = []
+    for value in values if isinstance(values, list) else []:
+        key = str(value).strip().lower()
+        if key in topic_map and key not in out:
+            out.append(key)
+    return out[:MAX_TOPICS]
 
 
 def _front_matter(text: str) -> tuple[list[str], int] | None:
