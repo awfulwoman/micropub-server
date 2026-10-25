@@ -73,6 +73,17 @@
   </fieldset>
   {% endif %}
 
+  {% if topics %}
+  {% set ticked = values.get('topic') if values else prefill.get('topic', []) %}
+  <fieldset>
+    <legend>Topics <span class="hint">up to 3; leave all unticked to choose from the tags</span></legend>
+    {% for key, title in topics %}
+    <label class="check"><input type="checkbox" name="topic" value="{{ key }}"
+      {{ 'checked' if key in ticked }}> {{ title }}</label>
+    {% endfor %}
+  </fieldset>
+  {% endif %}
+
   {% if targets %}
   <fieldset>
     <legend>Share to</legend>

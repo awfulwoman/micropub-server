@@ -30,6 +30,7 @@ from .publish import (
 )
 from .queries import _cursor, _decode_cursor, get_categories
 from .ui import page, safe_next, signed_in
+from .util import to_list
 
 PAGE_SIZE = 40
 STATUSES = [
@@ -262,6 +263,7 @@ async def _form_page(
         slots=PHOTO_SLOTS,
         targets=[t.info for t in s.targets],
         tags=await get_categories(s),
+        topics=list(s.topic_titles.items()) if s.topic_map else [],
         error=error,
         errors=errors or {},
         values=values or {},
@@ -420,6 +422,7 @@ def _prefill(s, props: dict[str, Any]) -> dict[str, Any]:
         "published": _local_time(s, props["published"]),
         "mp-slug": props.get("slug", ""),
         "syndicate": props.get("mp-syndicate-to") or [],
+        "topic": [str(t) for t in props.get("topic") or _imported_topics(props)],
     }
     for link in LINKS:
         out[link] = props.get(link, "")
@@ -431,6 +434,11 @@ def _prefill(s, props: dict[str, Any]) -> dict[str, Any]:
         out["checkin_name"] = card.get("name", "")
         out["checkin_lat"], out["checkin_lng"] = card.get("latitude", ""), card.get("longitude", "")
     return out
+
+
+def _imported_topics(props: dict[str, Any]) -> list[Any]:
+    extras = props.get("front-matter")
+    return to_list(extras.get("topics")) if isinstance(extras, dict) else []
 
 
 def _number(value: Any) -> float | None:
@@ -552,6 +560,12 @@ async def edit_submit(request: Request, session: dict[str, Any]) -> Response:
         )  # fmt: skip
 
     replace, delete = _diff(s, type_fields(key, cfg), props, built.jf2, prefill)
+    ticked = built.jf2.get("mp-topic") or []
+    if sorted(ticked) != sorted(prefill["topic"]):
+        if ticked:
+            replace["mp-topic"] = ticked
+        else:
+            delete.append("topic")
     chosen = [str(v) for v in form.getlist("syndicate") if v]
     if sorted(chosen) != sorted(prefill["syndicate"]) and s.targets:
         if chosen:

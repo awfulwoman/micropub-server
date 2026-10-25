@@ -19,6 +19,7 @@ from .posts import discover_post_type, normalise, render_template
 from .stores import Delete, Move, Put, StoreError
 from .target_enrich import enrich_props, refresh_props
 from .templates import render_post
+from .topics import MAX_TOPICS, topics_for_tags
 from .update import UpdateError, apply_update
 from .util import base_domain, to_list
 
@@ -101,6 +102,36 @@ async def _choose_path(
             return candidate_path, absolute_url(s.me, candidate_url)
         candidate_path, candidate_url = _suffix(path, url_path, k)
     raise MicropubError("invalid_request", "Could not find a free path for this post", 409)
+
+
+def _set_topics(
+    s: AppState, props: dict[str, Any], explicit: list[Any] | None, derive: bool
+) -> None:
+    """Spec 15: topics a client sent (mp-topic), else from the tags if `derive`, else unchanged."""
+    extras = props.get("front-matter")
+    if isinstance(extras, dict) and "topics" in extras:  # imported: the file's topics
+        props.setdefault("topic", [str(t) for t in to_list(extras.pop("topics"))])
+    if not s.topic_map:
+        return
+    if explicit is not None:
+        if len(explicit) > MAX_TOPICS:
+            raise MicropubError("invalid_request", f"A post can have at most {MAX_TOPICS} topics")
+        wanted = [str(t).strip().lower() for t in explicit]
+        topics = list(dict.fromkeys(t for t in wanted if t in s.topic_map))
+    elif derive:
+        topics = topics_for_tags([str(t) for t in to_list(props.get("category"))], s.topic_map)
+    else:
+        return
+    if topics:
+        props["topic"] = topics
+    else:
+        props.pop("topic", None)
+
+
+def _keys(op: Any) -> set[str]:
+    if isinstance(op, dict):
+        return set(op)
+    return {k for k in op if isinstance(k, str)} if isinstance(op, list) else set()
 
 
 def _origin(url: str) -> str:
@@ -213,6 +244,8 @@ async def create_post(
         else:
             del jf2["mp-syndicate-to"]
 
+    explicit_topics = to_list(jf2.pop("mp-topic")) if "mp-topic" in jf2 else None
+
     uploads = uploads or {}
     for prop, files in uploads.items():
         jf2[prop] = to_list(jf2.get(prop)) + [f"{UPLOAD}{prop}:{i}" for i in range(len(files))]
@@ -226,6 +259,7 @@ async def create_post(
         channels=list(s.config.channels),
         now=s.clock(),
     )
+    _set_topics(s, props, explicit_topics, derive=True)
 
     post_type = discover_post_type(s.post_types, props)
     cfg = s.post_types.get(post_type)
@@ -406,6 +440,13 @@ async def update_post(
         raise MicropubError("invalid_request", str(exc)) from exc
     if draft_mode:
         edited["post-status"] = "draft"
+    touched = _keys(add) | _keys(replace) | _keys(delete)
+    if "mp-topic" in edited:
+        explicit_topics: list[Any] | None = to_list(edited.pop("mp-topic"))
+    elif "topic" in touched:
+        explicit_topics = to_list(edited.get("topic"))
+    else:
+        explicit_topics = None
 
     app = s.config.application
     props = normalise(
@@ -416,6 +457,7 @@ async def update_post(
         channels=list(s.config.channels),
         now=s.clock(),
     )
+    _set_topics(s, props, explicit_topics, derive="category" in touched)
     # An edit only changes a post's type if it changes what discovery says about it. Otherwise a
     # note with a title (which discovery calls an article) would jump sections on its first edit.
     # A title alone never counts: on this site notes may have titles too.

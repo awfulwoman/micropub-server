@@ -22,7 +22,7 @@ _TYPE_SPECIFIC = [
     "quote_of", "quote_title", "quote_author", "quote_text", "quote_oembed",
     "place_name", "place_geo",
 ]  # fmt: skip
-_AFTER = ["tags", "images", "videos", "syndication"]
+_AFTER = ["tags", "topics", "images", "videos", "syndication"]
 
 
 def _yaml() -> YAML:

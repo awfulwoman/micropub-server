@@ -16,6 +16,7 @@ DEFAULT_MAPPING = {
     "updated": "lastmod",
     "summary": "description",
     "category": "tags",
+    "topic": "topics",
     "bookmark-of": "bookmark_of",
     "like-of": "like_of",
     "repost-of": "repost_of",
@@ -183,6 +184,8 @@ class Config(_Model):
     syndication: Syndication = Field(default_factory=Syndication)
     deploy: Deploy = Field(default_factory=Deploy)
     site_config_path: str | None = None
+    # The site's topic map (spec 15). Unset or unreadable: no topics are written.
+    topics_path: str | None = None
 
 
 def load_config(path: str | Path) -> Config:

@@ -189,6 +189,8 @@ Notes:
   ([06](06-post-templates.md#the-site-owns-the-shape)). The config key
   `site_config_path: data/micropub.yaml` (relative to the store) points at
   it. Set it to `null` to use only the local copy.
+- `topics_path: data/topics.yaml` (relative to the store) points at the
+  site's topic map ([15](15-topics.md)). Unset or unreadable: no topics.
 - `post_types` is a keyed map, as in Indiekit ADR 0005. Each key is the type
   name used by post type discovery.
 - `properties` and `required_properties` only feed `q=config` and

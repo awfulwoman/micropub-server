@@ -173,6 +173,8 @@ def _front_matter_to_jf2(
         props["updated"] = _normalise_offset(updated)
     if "tags" in fm:
         props["category"] = to_list(fm.pop("tags"))
+    if "topics" in fm:
+        props["topic"] = [str(t) for t in to_list(fm.pop("topics"))]
     if "syndication" in fm:
         props["syndication"] = [str(u) for u in to_list(fm.pop("syndication"))]
     if "description" in fm:

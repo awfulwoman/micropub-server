@@ -23,6 +23,7 @@ from .config import Config, PostType, Settings, SiteOverlay, Template
 from .db import Database
 from .stores import Store, StoreError
 from .target_meta import TargetMeta, fetch_target_meta
+from .topics import load_topic_map
 
 log = logging.getLogger("micropub_server")
 
@@ -41,6 +42,8 @@ class AppState:
     site: SiteOverlay | None = None
     targets: list[Any] = field(default_factory=list)  # syndication targets
     site_config_status: str = "disabled"
+    topic_map: dict[str, list[str]] = field(default_factory=dict)  # spec 15
+    topic_titles: dict[str, str] = field(default_factory=dict)
     jinja: Environment = field(init=False)
 
     def __post_init__(self) -> None:
@@ -79,6 +82,7 @@ class AppState:
 
     async def refresh_site_config(self) -> None:
         """Read the site's own data/micropub.yaml. Keep working if it is missing or broken."""
+        await self._refresh_topics()
         path = self.config.site_config_path
         if not path:
             self.site, self.site_config_status = None, "disabled"
@@ -98,6 +102,25 @@ class AppState:
         except (YAMLError, ValidationError) as exc:
             self.site, self.site_config_status = None, "fallback"
             log.warning("site config %s is invalid, using the local config: %s", path, exc)
+
+    async def _refresh_topics(self) -> None:
+        """Read the site's topic map. Missing or broken: no topics, and a warning."""
+        path = self.config.topics_path
+        if not path:
+            self.topic_map, self.topic_titles = {}, {}
+            return
+        try:
+            data = YAML(typ="safe").load(await self.store.read(path)) or {}
+        except (StoreError, YAMLError) as exc:
+            if not (isinstance(exc, StoreError) and exc.status != 404 and self.topic_map):
+                self.topic_map, self.topic_titles = {}, {}
+            log.warning("topic map %s unavailable: %s", path, exc)
+            return
+        self.topic_map = load_topic_map(data)
+        entries = data.items() if isinstance(data, dict) else []
+        self.topic_titles = {
+            str(k): str(v.get("title") or k) for k, v in entries if isinstance(v, dict)
+        }
 
 
 def create_app(state: AppState) -> Starlette:

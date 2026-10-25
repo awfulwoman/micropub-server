@@ -26,6 +26,8 @@ channels:
 # server falls back to the copies in this config, so keep a copy of docs/deploy/site-micropub.yaml's
 # post_types here if you want a fallback.
 site_config_path: data/micropub.yaml
+# The site's topic map (spec 15). Unset or unreadable: posts get no topics.
+topics_path: data/topics.yaml
 
 # Which GitHub workflow run means "the site is live". Needs WEBHOOK_SECRET and a webhook on the
 # site repo (docs/deploy/README.md, step 2.6).

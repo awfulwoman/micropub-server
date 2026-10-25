@@ -106,6 +106,7 @@ async def build_post(
     built.values = {k: v for k, v in form.items() if isinstance(v, str) and k not in {"csrf"}}
     built.values["photo_alt"] = [str(v) for v in form.getlist("photo_alt")]
     built.values["syndicate"] = [str(v) for v in form.getlist("syndicate")]
+    built.values["topic"] = [str(v) for v in form.getlist("topic") if v]
     jf2: dict[str, Any] = {"type": "entry"}
     errors = built.errors
 
@@ -164,6 +165,8 @@ async def build_post(
         jf2["mp-channel"] = channel
     if targets := [str(v) for v in form.getlist("syndicate") if v]:
         jf2["mp-syndicate-to"] = targets
+    if built.values["topic"]:  # none ticked: the server works them out from the tags (spec 15)
+        jf2["mp-topic"] = built.values["topic"]
     if "mp-photo-alt" in built.jf2:
         jf2["mp-photo-alt"] = built.jf2["mp-photo-alt"]
 
