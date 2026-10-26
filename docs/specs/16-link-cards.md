@@ -1,4 +1,4 @@
-# 16 Link cards for bookmarks
+# 16 Link cards for bookmarks and likes
 
 A bookmark on awfulwoman.com shows a card for the page it points at: the
 page's image, title, site name and description, as social media shows a
@@ -296,10 +296,35 @@ media:
 | micropub-server | Edit form: show the card, "Remove image", "Fetch the card again" |
 | infra | `fetch_target_image` and `media.card` in `composition-micropub-server` config; new keys in its fallback mapping |
 
+## Likes
+
+Likes get the same card, with these differences.
+
+- **Only likes with no embed.** A like of a toot or a tweet has `like_oembed`
+  and the site shows the embed ([06](06-post-templates.md#facts-about-the-link-target)).
+  When the lookup finds an embed, the server saves no card keys at all. Of the
+  72 likes today, 55 are tweets. About 17 likes of articles get a card.
+- **Keys:** `like_site`, `like_description`, `like_image`, `like_card`,
+  `like_card_archived`, with the same shapes and rules as the bookmark keys.
+  They go after `like_author` in front matter.
+- **Title:** a like has no title of its own, so the card's title is
+  `like_title`. If that is empty, the site uses the short form of `like_of`.
+- **Bundles:** the like `post.path` in the site's `data/micropub.yaml`
+  becomes `content/likes/{yyyy}/{MM}/{dd}/{slug}/index.md`. 71 of the 72
+  likes are bundles already.
+- **Microformats:** the card is `h-cite u-like-of`.
+- **Backfill:** `backfill-cards --type like` (default `bookmark`) runs the
+  same steps. There is no `scraped/` data for likes, so `--step scraped` does
+  nothing for them. `--step live` skips likes that have `like_oembed`.
+- **Edits:** the same as bookmarks, keyed on `like-of`. An edit that drops
+  `like-oembed` does not fetch a card by itself; use "Fetch the card again".
+
+The code takes the kind (`bookmark` or `like`) as a parameter everywhere.
+No card code names `bookmark` directly, except where the kinds differ.
+
 ## Open questions
 
 - **Repo size.** About 1,500 bookmarks at about 50 KB each is about 75 MB
-  added to the site repo, once. If that is too much, keep cards only for
-  bookmarks from a given year onwards (`--since`).
-- **Likes.** Likes of articles (not toots) could use the same card. This
-  spec is for bookmarks only. `KINDS` makes it a small change later.
+  added to the site repo, once. The `scraped` step suggests far less: its 52
+  images came to 1.9 MB as WebP, about 37 KB each. If that is too much, keep
+  cards only for bookmarks from a given year onwards (`--since`).
