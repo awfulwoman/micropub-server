@@ -351,3 +351,92 @@ def test_editing_an_old_bookmark_does_not_add_a_basedomain(client, imported, sit
     assert r.status_code == 200, r.text
     front, _ = fm(site, "content/bookmarks/2012/1125/index.md")
     assert front["tags"] == ["old"] and "basedomain" not in front
+
+
+# --- link cards on bookmarks (spec 16) ---------------------------------------------------
+CARD_PATH = "content/bookmarks/2026/10/26/snopes/index.md"
+CARD_FM = """---
+title: Jack Black's mom
+date: "2026-10-26T09:00:00+01:00"
+bookmark_of: 'https://www.snopes.com/fact-check/jack-black-mom/'
+bookmark_author: Alex Kasprak
+bookmark_site: Snopes.com
+bookmark_description: A tribute.
+bookmark_image:
+  file: card.webp
+  alt: ''
+  width: 800
+  height: 419
+bookmark_card_archived: https://web.archive.org/web/2020id_/https://www.snopes.com/x/
+---
+Nice.
+"""
+GONE_PATH = "content/bookmarks/2026/10/26/dead/index.md"
+GONE_FM = """---
+title: Dead link
+date: "2026-10-26T10:00:00+01:00"
+bookmark_of: https://dead.example/
+bookmark_card:
+  result: gone
+  checked: 2026-10-26
+---
+"""
+
+
+@pytest.fixture
+def cards(state, site):
+    for path, text in {
+        CARD_PATH: CARD_FM,
+        GONE_PATH: GONE_FM,
+        CARD_PATH.replace("index.md", "card.webp"): "WEBP",
+    }.items():
+        f = site / path
+        f.parent.mkdir(parents=True, exist_ok=True)
+        f.write_text(text)
+    return state
+
+
+async def test_card_keys_become_properties_not_extras(cards):
+    await run(cards)
+    p = json.loads(posts(cards)[CARD_PATH]["properties"])
+    assert p["bookmark-site"] == "Snopes.com" and p["bookmark-description"] == "A tribute."
+    assert p["bookmark-image"] == {"file": "card.webp", "alt": "", "width": 800, "height": 419}
+    assert (
+        p["bookmark-card-archived"]
+        == "https://web.archive.org/web/2020id_/https://www.snopes.com/x/"
+    )
+    assert p["front-matter"] == {"bookmark_author": "Alex Kasprak"}  # kept as before
+    gone = json.loads(posts(cards)[GONE_PATH]["properties"])
+    assert gone["bookmark-card"] == {"result": "gone", "checked": "2026-10-26"}
+    assert "front-matter" not in gone
+
+
+async def test_card_webp_is_recorded_as_media(cards):
+    await run(cards)
+    m = cards.db.query("SELECT * FROM media WHERE path LIKE '%/snopes/card.webp'")[0]
+    assert m["media_type"] == "photo" and m["content_type"] == "image/webp" and m["post_uid"]
+    assert m["url"] == "https://awfulwoman.com/bookmarks/2026/10/26/snopes/card.webp"
+
+
+async def test_card_posts_rerun_unchanged(cards):
+    first = await run(cards)
+    assert first.imported == 2 and first.failed == 0
+    again = await run(cards)
+    assert again.imported == 0 and again.unchanged == 2
+
+
+async def test_card_front_matter_round_trips(cards):
+    from micropub_server.publish import render_file
+
+    await run(cards)
+
+    def load(text):
+        y = YAML(typ="safe")
+        y.constructor.add_constructor(  # a bare date is the same text, whichever way it is read
+            "tag:yaml.org,2002:timestamp", lambda loader, node: loader.construct_scalar(node)
+        )
+        return y.load(text.split("---\n")[1])
+
+    for path, original in ((CARD_PATH, CARD_FM), (GONE_PATH, GONE_FM)):
+        props = json.loads(posts(cards)[path]["properties"])
+        assert load(render_file(cards, props)) == load(original)
