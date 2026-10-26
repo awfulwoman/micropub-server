@@ -52,6 +52,7 @@ publication:
   slug_separator: "-"
   enrich_post_data: false          # fetch mf2 for like-of etc.
   fetch_target_meta: true          # save title, author, embed of liked/quoted/bookmarked pages
+  fetch_target_image: true         # download a bookmark's card image into its bundle (16)
   categories: https://awfulwoman.com/tags/index.json   # list, or URL to a JSON list
   profile:                         # overrides h-card discovery for the profile scope
     name: Charlie O'Hara
@@ -74,6 +75,11 @@ media:
     max_height: 2560
     jpeg_quality: 85
   upload_path: content/_uploads/{yyyy}/{MM}/{md5}.{ext}
+  card:                            # bookmark link card images (16)
+    max_bytes: 5242880
+    max_width: 800
+    format: webp
+    quality: 80
 
 template:
   type: hugo

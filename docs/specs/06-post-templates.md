@@ -234,7 +234,7 @@ a changed link throws away the old page's values first.
 | Kind | Saved |
 | --- | --- |
 | like, quote | `title`, `author`, `text`, `oembed` |
-| bookmark | `author` (it already has its own title) |
+| bookmark | `author` (it already has its own title), and the link card: `site`, `description`, `image` ([16](16-link-cards.md)) |
 
 How each is found, best source first:
 
