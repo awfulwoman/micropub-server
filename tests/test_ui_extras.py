@@ -236,6 +236,16 @@ def test_preview_fetches_a_title(ui, no_network):
     assert r.json() == {"name": "The Real Title", "site": "Example", "summary": "About it"}
 
 
+def test_preview_falls_back_to_title_tag_and_twitter_description(ui, no_network):
+    no_network.get("https://example.com/t").respond(
+        200,
+        headers={"content-type": "text/html"},
+        text='<title>Plain</title><meta name="twitter:description" content="Tweeted">',
+    )
+    r = ui.get("/api/preview", params={"url": "https://example.com/t"})
+    assert r.json() == {"name": "Plain", "site": "example.com", "summary": "Tweeted"}
+
+
 def test_preview_refuses_private_addresses(ui):
     assert ui.get("/api/preview", params={"url": "http://127.0.0.1/"}).json() == {}
     assert ui.get("/api/preview", params={"url": "http://192.168.1.1/admin"}).json() == {}

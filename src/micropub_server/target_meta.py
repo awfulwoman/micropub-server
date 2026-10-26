@@ -10,7 +10,7 @@ from __future__ import annotations
 import asyncio
 import json
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any
 from urllib.parse import quote, urljoin, urlsplit
 
@@ -24,6 +24,8 @@ from .auth.client import FetchError, Resolver, assert_fetchable, guarded_client,
 MAX_PAGE_CHARS = 500_000
 MAX_TEXT_CHARS = 1_500
 MAX_TITLE_CHARS = 200
+MAX_SITE_CHARS = 100
+MAX_DESCRIPTION_CHARS = 300
 TOTAL_TIMEOUT = 12
 HOP_LIMIT = 4
 USER_AGENT = "micropub-server link metadata"
@@ -32,7 +34,7 @@ USER_AGENT = "micropub-server link metadata"
 KINDS = {
     "like": ("title", "author", "text", "oembed"),
     "quote": ("title", "author", "text", "oembed"),
-    "bookmark": ("author",),  # a bookmark already has its own title
+    "bookmark": ("author", "site", "description"),  # a bookmark already has its own title
 }
 TARGET_PROPS = {"like": "like-of", "quote": "quotation-of", "bookmark": "bookmark-of"}
 
@@ -56,6 +58,10 @@ class TargetMeta:
     text: str = ""  # the original words, kept only to back up an embed that fails to load
     oembed: str = ""
     entry_text: str = field(default="", compare=False)  # text the page itself gave, if any
+    site: str = ""
+    description: str = ""
+    image_url: str = ""  # absolute; the card image is fetched from here, never linked
+    image_alt: str = ""
 
     def as_props(self, kind: str) -> dict[str, str]:
         """Micropub-style properties for this kind of post, empty ones left out."""
@@ -134,8 +140,12 @@ def _json_ld_author(soup: BeautifulSoup) -> str:
     return ""
 
 
+def _first_meta(meta_tags: dict[str, str], *keys: str) -> str:
+    return next((meta_tags[key] for key in keys if meta_tags.get(key, "").strip()), "")
+
+
 def extract_page(html: str, url: str) -> TargetMeta:
-    """Title and author from a page, best source first: its h-entry, then OpenGraph, then HTML."""
+    """Title, author and card facts from a page, best source first: its h-entry, then meta tags."""
     if not html.strip():
         return TargetMeta()
     soup = BeautifulSoup(html, "html.parser")
@@ -145,6 +155,12 @@ def extract_page(html: str, url: str) -> TargetMeta:
         if key and tag.get("content"):
             meta_tags.setdefault(key, tag["content"])
     site = _clean(meta_tags.get("og:site_name"))
+    card_site = _clean(
+        _first_meta(meta_tags, "og:site_name", "application-name")
+        or (urlsplit(url).hostname or "").removeprefix("www."),
+        MAX_SITE_CHARS,
+    )
+    image = _first_meta(meta_tags, "og:image:secure_url", "og:image", "twitter:image")
 
     title = author = entry_text = ""
     implied = False
@@ -186,6 +202,13 @@ def extract_page(html: str, url: str) -> TargetMeta:
         title=_strip_site(title, site),
         author=author,
         entry_text=_text_block(entry_text),
+        site=card_site,
+        description=_clean(
+            _first_meta(meta_tags, "og:description", "twitter:description", "description"),
+            MAX_DESCRIPTION_CHARS,
+        ),
+        image_url=urljoin(url, image.strip()) if image else "",
+        image_alt=_clean(_first_meta(meta_tags, "og:image:alt", "twitter:image:alt")),
     )
 
 
@@ -246,12 +269,11 @@ def apply_oembed(meta: TargetMeta, data: dict[str, Any]) -> TargetMeta:
     if not html:
         return meta
     text = meta.text or meta.entry_text or _embed_text(html)
-    return TargetMeta(
-        title=meta.title,
+    return replace(
+        meta,
         author=meta.author or clean_author(data.get("author_name")),
         text=text,
         oembed=html,
-        entry_text=meta.entry_text,
     )
 
 

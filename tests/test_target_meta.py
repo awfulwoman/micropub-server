@@ -124,6 +124,96 @@ def test_props_are_named_for_the_kind():
     assert TargetMeta(title="T", author="A").as_props("bookmark") == {"bookmark-author": "A"}
 
 
+# --- card facts ----------------------------------------------------------------------------------
+def _head(*tags: str) -> str:
+    return "<html><head><title>T</title>" + "".join(tags) + "</head><body></body></html>"
+
+
+URL = "https://www.example.com/a/b"
+
+
+def test_site_falls_back_from_og_to_application_name_to_the_host():
+    og = _head(
+        '<meta property="og:site_name" content="OG Site">',
+        '<meta name="application-name" content="App">',
+    )
+    assert extract_page(og, URL).site == "OG Site"
+    assert extract_page(_head('<meta name="application-name" content="App">'), URL).site == "App"
+    assert extract_page(_head(), URL).site == "example.com"
+
+
+def test_site_is_cut_at_100_characters():
+    meta = extract_page(_head(f'<meta property="og:site_name" content="{"s" * 150}">'), URL)
+    assert len(meta.site) == 100 and meta.site.endswith("…")
+
+
+def test_description_falls_back_from_og_to_twitter_to_meta():
+    tags = {
+        "og": '<meta property="og:description" content="from og">',
+        "tw": '<meta name="twitter:description" content="from twitter">',
+        "plain": '<meta name="description" content="from meta">',
+    }
+    assert extract_page(_head(*tags.values()), URL).description == "from og"
+    assert extract_page(_head(tags["tw"], tags["plain"]), URL).description == "from twitter"
+    assert extract_page(_head(tags["plain"]), URL).description == "from meta"
+    assert extract_page(_head(), URL).description == ""
+
+
+def test_long_description_is_cut_at_300_characters_with_an_ellipsis():
+    meta = extract_page(_head(f'<meta name="description" content="{"word " * 100}">'), URL)
+    assert len(meta.description) <= 300 and meta.description.endswith("…")
+
+
+def test_description_whitespace_is_folded():
+    meta = extract_page(_head('<meta name="description" content="a\n   b\t c">'), URL)
+    assert meta.description == "a b c"
+
+
+def test_image_falls_back_from_secure_url_to_og_to_twitter():
+    secure = '<meta property="og:image:secure_url" content="https://cdn.example.com/s.png">'
+    og = '<meta property="og:image" content="https://cdn.example.com/o.png">'
+    tw = '<meta name="twitter:image" content="https://cdn.example.com/t.png">'
+    assert extract_page(_head(og, secure), URL).image_url == "https://cdn.example.com/s.png"
+    assert extract_page(_head(tw, og), URL).image_url == "https://cdn.example.com/o.png"
+    assert extract_page(_head(tw), URL).image_url == "https://cdn.example.com/t.png"
+    assert extract_page(_head(), URL).image_url == ""
+
+
+def test_relative_image_url_is_made_absolute_against_the_page():
+    meta = extract_page(_head('<meta property="og:image" content="/img/card.jpg">'), URL)
+    assert meta.image_url == "https://www.example.com/img/card.jpg"
+    meta = extract_page(_head('<meta property="og:image" content="card.jpg">'), URL)
+    assert meta.image_url == "https://www.example.com/a/card.jpg"
+
+
+def test_image_alt_falls_back_from_og_to_twitter():
+    og = '<meta property="og:image:alt" content="og alt">'
+    tw = '<meta name="twitter:image:alt" content="tw alt">'
+    assert extract_page(_head(tw, og), URL).image_alt == "og alt"
+    assert extract_page(_head(tw), URL).image_alt == "tw alt"
+    assert extract_page(_head(), URL).image_alt == ""
+
+
+def test_bookmark_props_carry_site_and_description_but_not_the_image():
+    meta = TargetMeta(
+        author="A", site="S", description="D", image_url="https://x/i.png", image_alt="alt"
+    )
+    assert meta.as_props("bookmark") == {
+        "bookmark-author": "A",
+        "bookmark-site": "S",
+        "bookmark-description": "D",
+    }
+    assert TargetMeta(site="S").as_props("bookmark") == {"bookmark-site": "S"}
+    assert TargetMeta(image_url="https://x/i.png").as_props("bookmark") == {}
+
+
+def test_oembed_keeps_the_card_facts():
+    meta = apply_oembed(
+        TargetMeta(site="S", description="D", image_url="https://x/i.png"), {"html": "<p>hi</p>"}
+    )
+    assert (meta.site, meta.description, meta.image_url) == ("S", "D", "https://x/i.png")
+
+
 # --- fetching ------------------------------------------------------------------------------------
 import pytest  # noqa: E402
 

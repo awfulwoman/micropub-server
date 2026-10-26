@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 import posixpath
 import re
-from html.parser import HTMLParser
 from typing import Any
 from urllib.parse import urlencode, urljoin
 
@@ -23,6 +22,7 @@ from .media_service import delete_media, prepare_media, record_media
 from .publish import MicropubError
 from .routes_ui import _form_page, _title
 from .stores import Put, StoreError
+from .target_meta import MAX_PAGE_CHARS, extract_page
 from .ui import page, signed_in
 
 _URL = re.compile(r"https?://[^\s<>\"]+")
@@ -217,34 +217,6 @@ async def status_page(request: Request, session: dict[str, Any]) -> Response:
 
 
 # --- link preview for the bookmark form ------------------------------------------------------------------
-class _Head(HTMLParser):
-    def __init__(self) -> None:
-        super().__init__()
-        self.title = ""
-        self.meta: dict[str, str] = {}
-        self._in_title = False
-        self.done = False
-
-    def handle_starttag(self, tag, attrs):
-        a = dict(attrs)
-        if tag == "title":
-            self._in_title = True
-        elif tag == "meta":
-            key = a.get("property") or a.get("name")
-            if key and a.get("content"):
-                self.meta.setdefault(key.lower(), a["content"])
-
-    def handle_endtag(self, tag):
-        if tag == "title":
-            self._in_title = False
-        elif tag == "head":
-            self.done = True
-
-    def handle_data(self, data):
-        if self._in_title:
-            self.title += data
-
-
 async def _fetch_preview(s, url: str) -> dict[str, str]:
     headers = {"Accept": "text/html", "User-Agent": "micropub-server link preview"}
     async with guarded_client(s.resolver, timeout=6, follow_redirects=False) as client:
@@ -259,15 +231,9 @@ async def _fetch_preview(s, url: str) -> dict[str, str]:
             return {}
     if response.status_code != 200 or "html" not in response.headers.get("content-type", ""):
         return {}
-    head = _Head()
-    head.feed(response.text[:200_000])
-    name = head.meta.get("og:title") or " ".join(head.title.split())
-    result = {
-        "name": name,
-        "site": head.meta.get("og:site_name", ""),
-        "summary": head.meta.get("og:description") or head.meta.get("description", ""),
-    }
-    return {k: v.strip() for k, v in result.items() if v and v.strip()}
+    meta = extract_page(response.text[:MAX_PAGE_CHARS], url)
+    result = {"name": meta.title, "site": meta.site, "summary": meta.description}
+    return {k: v for k, v in result.items() if v}
 
 
 async def preview(request: Request) -> Response:
