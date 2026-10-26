@@ -129,7 +129,7 @@ def test_bookmark_uses_site_key_names(client, bearer, site):
     )
     assert r.status_code == 202
     text = read(site, "content/bookmarks/2026/10/14/1910/index.md")
-    assert "bookmark_of: https://www.hackaday.io/p/1" in text and "basedomain: hackaday.io" in text
+    assert "bookmark_of: https://www.hackaday.io/p/1" in text and "basedomain" not in text
     assert "bookmarkOf" not in text and "uid:" not in text and "publishDate" not in text
 
 

@@ -389,8 +389,7 @@ def test_card_keys_sit_next_to_bookmark_of(client, full, site, targets, images):
         "bookmark_image",
     ]
     start = keys.index("bookmark_of")
-    assert keys[start + 1] == "basedomain"
-    assert [k for k in keys[start:] if k != "basedomain"] == wanted
+    assert keys[start:] == wanted
 
 
 # --- link cards for likes (spec 16, Likes) -----------------------------------------------------

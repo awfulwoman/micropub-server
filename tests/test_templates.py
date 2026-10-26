@@ -38,14 +38,12 @@ def test_bookmark_keys_match_site_layouts():
             "published": "2026-10-14T19:12:00+02:00",
             "name": "Internet-Week Clock",
             "bookmark-of": "https://www.hackaday.io/project/1",
-            "basedomain": "hackaday.io",
             "content": {"text": "Ridiculous"},
         }
     )
     fm, body = split(out)
     assert fm["title"] == "Internet-Week Clock"
     assert fm["bookmark_of"] == "https://www.hackaday.io/project/1"
-    assert fm["basedomain"] == "hackaday.io"
     assert "bookmarkOf" not in fm and "publishDate" not in fm and "uid" not in fm
     assert body.strip() == "Ridiculous"
 

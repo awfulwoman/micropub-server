@@ -16,7 +16,7 @@ _INTERNAL = {"type", "post-type", "post-status", "content", "front-matter"}
 _DATES = {"date", "lastmod", "expiryDate"}
 _FRONT = ["title", "date", "lastmod", "draft"]
 _TYPE_SPECIFIC = [
-    "bookmark_of", "basedomain", "bookmark_author", "bookmark_site", "bookmark_description",
+    "bookmark_of", "bookmark_author", "bookmark_site", "bookmark_description",
     "bookmark_image", "bookmark_card", "bookmark_card_archived",
     "like_of", "like_title", "like_author",
     "like_site", "like_description", "like_image", "like_card", "like_card_archived",

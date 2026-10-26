@@ -138,10 +138,7 @@ def test_bookmark(ui, site):
         {"bookmark-of": "https://www.example.com/page", "name": "A page", "content": "Nice"},
     )
     front, _ = fm(site, "content/bookmarks/2026/10/14/1910/index.md")
-    assert (
-        front["bookmark_of"] == "https://www.example.com/page"
-        and front["basedomain"] == "example.com"
-    )
+    assert front["bookmark_of"] == "https://www.example.com/page" and "basedomain" not in front
 
 
 @pytest.mark.parametrize("bad", ["not a url", "javascript:alert(1)", "ftp://x.example/", "http://"])

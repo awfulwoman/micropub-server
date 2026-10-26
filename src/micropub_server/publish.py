@@ -31,7 +31,7 @@ from .target_enrich import (
 from .templates import render_post
 from .topics import MAX_TOPICS, topics_for_tags
 from .update import UpdateError, apply_update
-from .util import base_domain, to_list
+from .util import to_list
 
 UPLOAD = "upload:"  # placeholder URL for a file sent with the post: upload:<property>:<index>
 MEDIA_PROPERTIES = ("photo", "video", "audio")
@@ -310,10 +310,6 @@ async def create_post(
             f"This would be saved as a {post_type} post, not a {expect_type}. Check the fields.",
             422,
         )
-    if props.get("bookmark-of"):
-        props["basedomain"] = base_domain(
-            str(props["bookmark-of"])
-        )  # the layout shows "Original link on ..."
     card = await enrich_props(s, props)
 
     uid = str(uuid7())
@@ -513,14 +509,8 @@ async def update_post(
             "not_implemented", f"No post type is configured for {post_type} posts", 501
         )
     props["uid"], props["post-type"] = row["uid"], post_type
-    if props.get("bookmark-of") != old.get("bookmark-of") and (
-        "basedomain" in props or "basedomain" in props.get("front-matter", {})
-    ):
-        props.get("front-matter", {}).pop("basedomain", None)
-        if props.get("bookmark-of"):
-            props["basedomain"] = base_domain(str(props["bookmark-of"]))
-        else:
-            props.pop("basedomain", None)
+    props.pop("basedomain", None)  # an old Indiekit key; the layout reads bookmark_of
+    props.get("front-matter", {}).pop("basedomain", None)
 
     card = await refresh_props(s, props, old) or card  # `card`: one the caller already fetched
     if refetch_card_of:  # asked for: a new card for the same link, from the page as it is now

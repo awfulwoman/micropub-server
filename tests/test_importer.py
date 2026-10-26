@@ -353,6 +353,18 @@ def test_editing_an_old_bookmark_does_not_add_a_basedomain(client, imported, sit
     assert front["tags"] == ["old"] and "basedomain" not in front
 
 
+def test_editing_a_bookmark_drops_its_old_basedomain(client, imported, site):
+    url = "https://awfulwoman.com/bookmarks/2025/01/23/1059/"
+    r = client.post(
+        "/micropub",
+        json={"action": "update", "url": url, "add": {"category": ["old"]}},
+        headers=imported,
+    )
+    assert r.status_code == 200, r.text
+    front, _ = fm(site, "content/bookmarks/2025/01/23/1059.md")
+    assert front["tags"] == ["old"] and "basedomain" not in front
+
+
 # --- link cards on bookmarks (spec 16) ---------------------------------------------------
 CARD_PATH = "content/bookmarks/2026/10/26/snopes/index.md"
 CARD_FM = """---
