@@ -460,6 +460,7 @@ async def update_post(
     delete: Any = None,
     draft_mode: bool = False,
     refetch_card_of: str | None = None,
+    card: Card | None = None,
 ) -> Updated:
     row = _find_post(s, url)
     if row["deleted"]:
@@ -521,7 +522,7 @@ async def update_post(
         else:
             props.pop("basedomain", None)
 
-    card = await refresh_props(s, props, old)
+    card = await refresh_props(s, props, old) or card  # `card`: one the caller already fetched
     if refetch_card_of:  # asked for: a new card for the same link, from the page as it is now
         card = await refetch_card(s, props, refetch_card_of) or card
     old_path, old_url = row["path"], row["url"]

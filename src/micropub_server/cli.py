@@ -152,6 +152,11 @@ def _backfill_cards(args) -> int:
     from . import backfill_cards as bc
     from .config import MediaCard
 
+    if not args.checkout:
+        return _backfill_cards_server(args)
+    if not args.step:
+        print("--step is required", file=sys.stderr)
+        return 1
     root = Path(args.checkout)
     if not (root / f"content/{args.type}s").is_dir():
         print(f"no content/{args.type}s in {root}", file=sys.stderr)
@@ -184,9 +189,15 @@ def _backfill_cards(args) -> int:
         )
     )
     prefix = "would: " if args.dry_run else ""
+    _print_card_report(card, prefix)
+    return 0
+
+
+def _print_card_report(card, prefix: str = "") -> None:
+    failed = f", failed {card.failed}" if card.failed else ""
     print(
         f"{prefix}found {card.found}, gone {card.gone}, none {card.none}, embed {card.embed}, "
-        f"retry {card.retry}, skipped {card.skipped}"
+        f"retry {card.retry}, skipped {card.skipped}{failed}"
     )
     for path, props in card.changes:
         print(f"  {path}: {', '.join(props)}")
@@ -194,7 +205,44 @@ def _backfill_cards(args) -> int:
         print("retry these:")
         for url in card.retry_urls:
             print(f"  {url}")
-    return 0
+
+
+def _backfill_cards_server(args) -> int:
+    import asyncio
+
+    from . import backfill_cards as bc
+
+    if args.step in (None, "scraped"):
+        print(
+            "--step scraped needs --checkout: it reads the scraped/ files of a site checkout. "
+            "Without --checkout, use --step live or archive.",
+            file=sys.stderr,
+        )
+        return 1
+    try:
+        state = _state()
+    except ConfigError as exc:
+        print(f"config error: {exc}", file=sys.stderr)
+        return 1
+
+    async def run():
+        await state.refresh_site_config()
+        return await bc.backfill_cards_server(
+            state,
+            args.step,
+            kind=args.type,
+            dry_run=args.dry_run,
+            limit=args.limit,
+            since=args.since,
+            before=args.before,
+            recheck=args.recheck,
+            image=not args.no_image,
+            delay=args.delay,
+        )
+
+    report = asyncio.run(run())
+    _print_card_report(report, "would: " if args.dry_run else "")
+    return 1 if report.failed else 0
 
 
 def _serve(_args) -> int:
@@ -269,15 +317,18 @@ def main(argv: list[str] | None = None) -> int:
     back.set_defaults(func=_backfill_targets)
     cards = sub.add_parser(
         "backfill-cards",
-        help="add link cards (site, description, image) to the bookmarks or likes of a site checkout",
+        help="add link cards (site, description, image) to the bookmarks or likes of a site checkout, or of the database",
     )
     cards.add_argument(
         "--type", choices=sorted(CARD_KINDS), default="bookmark", help="bookmark (default) or like"
     )
-    cards.add_argument("--checkout", required=True, help="a local checkout of the site repo")
+    cards.add_argument(
+        "--checkout",
+        help="a local checkout of the site repo; without it the posts in the database are "
+        "edited through the server (live and archive only)",
+    )
     cards.add_argument(
         "--step",
-        required=True,
         choices=STEPS,
         help="scraped: the old scraped/ cards, no network; live: fetch each page; "
         "archive: the Wayback Machine, for pages marked gone",

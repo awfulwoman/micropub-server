@@ -14,12 +14,14 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import re
 import shutil
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
+from typing import TYPE_CHECKING
 from urllib.parse import urlsplit
 
 import httpx
@@ -28,9 +30,11 @@ from ruamel.yaml import YAML
 from .auth.client import FetchError, Resolver, guarded_client, system_resolver
 from .card_image import CARD_FILENAME, CardImage, fetch_card, process_card
 from .config import MediaCard
+from .target_enrich import Card, _target_url
 from .target_files import add_card_to_front_matter, card_keys, set_card_marker
 from .target_meta import (
     _TWITTER_HOSTS,
+    TARGET_PROPS,
     TOTAL_TIMEOUT,
     TargetMeta,
     _clean,
@@ -39,6 +43,10 @@ from .target_meta import (
     extract_page,
 )
 
+if TYPE_CHECKING:
+    from .app import AppState
+
+log = logging.getLogger(__name__)
 STEPS = ("scraped", "live", "archive")
 LIVE_DELAY = 1.0
 ARCHIVE_DELAY = 4.0  # the Wayback Machine blocks faster clients
@@ -128,9 +136,34 @@ class CardReport:
     none: int = 0
     embed: int = 0  # a like whose page gave an embed: nothing written
     retry: int = 0
+    failed: int = 0  # server mode: the edit could not be saved
     skipped: int = 0  # already have keys or a marker, or out of range
     retry_urls: list[str] = field(default_factory=list)
     changes: list[tuple[str, dict]] = field(default_factory=list)
+
+
+def marker_of(front: dict, kind: str) -> str:
+    """The result in a post's `<kind>_card` marker (gone, none), or "". `front` has `_` keys."""
+    value = front.get(f"{kind}_card")
+    return str(value.get("result", "")) if isinstance(value, dict) else ""
+
+
+def has_card(front: dict, kind: str) -> bool:
+    return any(front.get(key) for key in card_keys(kind))
+
+
+def wants_live(front: dict, kind: str, recheck: bool = False) -> bool:
+    """The skip rules of the live step, for a checkout and the server alike."""
+    return not (
+        has_card(front, kind)
+        or (marker_of(front, kind) and not recheck)
+        or (kind == "like" and front.get("like_oembed"))
+    )
+
+
+def wants_archive(front: dict, kind: str, day: str) -> bool:
+    """The skip rules of the archive step: a post marked gone, with a date to look up."""
+    return marker_of(front, kind) == "gone" and not has_card(front, kind) and bool(day)
 
 
 @dataclass
@@ -142,11 +175,10 @@ class _Post:
     day: str  # YYYY-MM-DD, or ""
 
     def marker(self, kind: str) -> str:
-        value = self.front.get(f"{kind}_card")
-        return str(value.get("result", "")) if isinstance(value, dict) else ""
+        return marker_of(self.front, kind)
 
     def has_card(self, kind: str) -> bool:
-        return any(self.front.get(key) for key in card_keys(kind))
+        return has_card(self.front, kind)
 
 
 def _read(path: Path, kind: str) -> _Post | None:
@@ -171,12 +203,16 @@ def _posts(root: Path, kind: str):
             yield post
 
 
-def _in_range(post: _Post, since: int | None, before: str | None) -> bool:
+def in_range(day: str, since: int | None, before: str | None) -> bool:
     if since is None and before is None:
         return True
-    if not post.day:
+    if not day:
         return False
-    return (since is None or int(post.day[:4]) >= since) and (before is None or post.day < before)
+    return (since is None or int(day[:4]) >= since) and (before is None or day < before)
+
+
+def _in_range(post: _Post, since: int | None, before: str | None) -> bool:
+    return in_range(post.day, since, before)
 
 
 class _Throttle:
@@ -287,6 +323,40 @@ def _save_card(
     return True
 
 
+FetchImage = Callable[[str], Awaitable["CardImage | None"]]  # None: no image to use
+
+
+def _fetcher(resolver: Resolver, card: MediaCard, image: bool) -> FetchImage | None:
+    return (lambda url: fetch_card(url, resolver, card)) if image else None
+
+
+async def live_outcome(
+    url: str, kind: str, resolver: Resolver, fetch_image: FetchImage | None, throttle: _Throttle
+) -> tuple[str, TargetMeta, CardImage | None]:
+    """Fetch a page and decide: (outcome, what it said, the card image if found). Shared by modes.
+
+    `fetch_image` is None for text only.
+    """
+    outcome, meta = await probe(url, kind, resolver)
+    fetched = None
+    if outcome == "found" and fetch_image and meta.image_url:
+        await throttle.wait()
+        fetched = await fetch_image(meta.image_url)
+    return outcome, meta, fetched
+
+
+async def archive_outcome(
+    url: str, day: str, kind: str, resolver: Resolver, fetch_image: FetchImage | None,
+    throttle: _Throttle,
+) -> tuple[str, TargetMeta | None, dict, CardImage | None]:  # fmt: skip
+    """The Wayback Machine for one post: (outcome, meta, extra props, image). Never raises."""
+    try:
+        async with asyncio.timeout(ARCHIVE_TIMEOUT):
+            return await _archived(url, day, kind, resolver, fetch_image, throttle)
+    except (FetchError, httpx.HTTPError, ValueError, TimeoutError):
+        return "retry", None, {}, None
+
+
 async def backfill_live(
     root: Path,
     card: MediaCard,
@@ -308,19 +378,16 @@ async def backfill_live(
     today = today or date.today().isoformat()
     report, throttle, tried = CardReport(), _Throttle(delay, sleep), 0
     for post in _posts(root, kind):
-        if (
-            post.has_card(kind)
-            or (post.marker(kind) and not recheck)
-            or (kind == "like" and post.front.get("like_oembed"))
-            or not _in_range(post, since, before)
-        ):
+        if not wants_live(post.front, kind, recheck) or not _in_range(post, since, before):
             report.skipped += 1
             continue
         if limit is not None and tried >= limit:
             break
         tried += 1
         await throttle.wait()
-        outcome, meta = await probe(post.url, kind, resolver)
+        outcome, meta, fetched = await live_outcome(
+            post.url, kind, resolver, _fetcher(resolver, card, image), throttle
+        )
         if outcome == "retry":
             report.retry += 1
             report.retry_urls.append(post.url)
@@ -329,10 +396,6 @@ async def backfill_live(
         elif outcome in ("gone", "none"):
             _mark(report, root, post, kind, outcome, dry_run, today)
         else:
-            fetched = None
-            if image and meta.image_url:
-                await throttle.wait()
-                fetched = await fetch_card(meta.image_url, resolver, card)
             text = set_card_marker(post.text, kind, None) or post.text  # --recheck drops the marker
             _save_card(
                 report, root, post, kind, text, _card_props(kind, meta, fetched), fetched, dry_run
@@ -382,24 +445,15 @@ async def backfill_archive(
     today = today or date.today().isoformat()
     report, throttle, tried = CardReport(), _Throttle(delay, sleep), 0
     for post in _posts(root, kind):
-        if (
-            post.marker(kind) != "gone"
-            or post.has_card(kind)
-            or not post.day
-            or not _in_range(post, since, before)
-        ):
+        if not wants_archive(post.front, kind, post.day) or not _in_range(post, since, before):
             report.skipped += 1
             continue
         if limit is not None and tried >= limit:
             break
         tried += 1
-        try:
-            async with asyncio.timeout(ARCHIVE_TIMEOUT):
-                outcome, meta, props_extra, fetched = await _archived(
-                    post, kind, card, image, resolver, throttle
-                )
-        except (FetchError, httpx.HTTPError, ValueError, TimeoutError):
-            outcome, meta, props_extra, fetched = "retry", None, {}, None
+        outcome, meta, props_extra, fetched = await archive_outcome(
+            post.url, post.day, kind, resolver, _fetcher(resolver, card, image), throttle
+        )
         if outcome == "retry":
             report.retry += 1
             report.retry_urls.append(post.url)
@@ -412,25 +466,132 @@ async def backfill_archive(
     return report
 
 
-async def _archived(post, kind, card, image, resolver, throttle):
+async def _archived(url, day, kind, resolver, fetch_image, throttle):
     """(outcome, meta, extra props, image) from the nearest Wayback capture of one post."""
     async with guarded_client(resolver, timeout=10, follow_redirects=False) as client:
         await throttle.wait()
-        found = await _wayback_lookup(client, resolver, post.url, post.day)
+        found = await _wayback_lookup(client, resolver, url, day)
         if found is None:
             return "none", None, {}, None
         stamp, snapshot = found
         await throttle.wait()
-        response = await _get(client, _wayback(stamp, post.url), resolver, "text/html")
+        response = await _get(client, _wayback(stamp, url), resolver, "text/html")
     if response.status_code in (403, 429) or response.status_code >= 500:
         return "retry", None, {}, None
     if response.status_code != 200:
         return "none", None, {}, None
-    meta = extract_page(response.text[:500_000], post.url)  # the original URL: relative paths
+    meta = extract_page(response.text[:500_000], url)  # the original URL: relative paths
     if not (meta.description or meta.image_url):
         return "none", None, {}, None
     fetched = None
-    if image and meta.image_url:
+    if fetch_image and meta.image_url:
         await throttle.wait()
-        fetched = await fetch_card(_wayback(stamp, meta.image_url), resolver, card)
+        fetched = await fetch_image(_wayback(stamp, meta.image_url))
     return "found", meta, {f"{kind}_card_archived": snapshot}, fetched
+
+
+# --- through the server (no --checkout) ---
+
+
+async def backfill_cards_server(
+    s: AppState,
+    step: str,
+    *,
+    kind: str = "bookmark",
+    dry_run: bool = False,
+    limit: int | None = None,
+    since: int | None = None,
+    before: str | None = None,
+    recheck: bool = False,
+    image: bool = True,
+    delay: float | None = None,
+    sleep: Sleep = asyncio.sleep,
+    today: str | None = None,
+) -> CardReport:
+    """`live` or `archive` on the posts of this kind in the database, each saved as an edit.
+
+    The decisions are the checkout mode's (`wants_live`, `live_outcome` ...). One commit each, with
+    `card.webp` in it. A dry run fetches and reports but writes nothing. Raises ValueError for
+    `scraped`, which needs a checkout.
+    """
+    from .publish import MicropubError, update_post
+
+    if step not in ("live", "archive"):
+        raise ValueError(f"--step {step} needs --checkout: only live and archive run on the server")
+    today = today or date.today().isoformat()
+    if delay is None:
+        delay = LIVE_DELAY if step == "live" else ARCHIVE_DELAY
+    resolver, card = s.resolver, s.config.media.card
+    image = image and s.config.publication.fetch_target_image
+
+    async def fetch_image(url: str) -> CardImage | None:
+        try:
+            return await s.image_fetcher(url, resolver, card, TOTAL_TIMEOUT)
+        except Exception:  # the card just has no image
+            return None
+
+    report, throttle, tried = CardReport(), _Throttle(delay, sleep), 0
+    rows = s.db.query(
+        "SELECT url, properties, published FROM posts WHERE deleted IS NULL AND post_type = ?"
+        " ORDER BY published",
+        (kind,),
+    )
+    for row in rows:
+        props = json.loads(row["properties"])
+        extras = props.get("front-matter")
+        front = {k.replace("-", "_"): v for k, v in props.items()} | (
+            extras if isinstance(extras, dict) else {}
+        )
+        url, day = _target_url(props.get(TARGET_PROPS[kind])), str(row["published"])[:10]
+        wanted = (
+            wants_live(front, kind, recheck) if step == "live" else wants_archive(front, kind, day)
+        )
+        if not url or not wanted or not in_range(day, since, before):
+            report.skipped += 1
+            continue
+        if limit is not None and tried >= limit:
+            break
+        tried += 1
+        fetcher = fetch_image if image else None
+        if step == "live":
+            outcome, meta, fetched = await live_outcome(url, kind, resolver, fetcher, throttle)
+            extra: dict = {}
+        else:
+            outcome, meta, extra, fetched = await archive_outcome(
+                url, day, kind, resolver, fetcher, throttle
+            )
+        if outcome == "retry":
+            report.retry += 1
+            report.retry_urls.append(url)
+            continue
+        if outcome == "embed":
+            report.embed += 1  # the embed backfill (backfill-targets) owns this one
+            continue
+        marker = f"{kind}-card"
+        if outcome == "found":
+            facts = {f"{kind}-site": meta.site, f"{kind}-description": meta.description}
+            facts |= {k.replace("_", "-"): v for k, v in extra.items()}  # card-archived
+            replace = {k: [v] for k, v in facts.items() if v}
+            delete = [marker] if marker_of(front, kind) else None
+            changes = {k: v[0] for k, v in replace.items()}
+        else:
+            replace = {marker: [{"result": outcome, "checked": today}]}
+            delete, fetched = None, None
+            changes = {marker: outcome}
+        report.changes.append((row["url"], changes))
+        setattr(report, outcome, getattr(report, outcome) + 1)
+        if dry_run:
+            continue
+        try:
+            await update_post(
+                s,
+                row["url"],
+                replace=replace,
+                delete=delete,
+                card=Card(fetched, meta.image_alt, kind) if fetched else None,
+            )
+        except MicropubError:
+            log.exception("could not update %s", row["url"])
+            setattr(report, outcome, getattr(report, outcome) - 1)
+            report.failed += 1
+    return report
