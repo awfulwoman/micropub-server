@@ -61,6 +61,8 @@ class Publication(_Model):
     enrich_post_data: bool = False
     # Look up the title, author and embed of a liked, quoted or bookmarked page when posting.
     fetch_target_meta: bool = True
+    # Also download a bookmark's card image into its bundle (spec 16). Needs fetch_target_meta.
+    fetch_target_image: bool = True
     categories: list[str] | str = Field(default_factory=list)
     profile: dict[str, str] = Field(default_factory=dict)
     commit_message: str = "{action} {post_type} {file_type}"
@@ -81,9 +83,19 @@ class MediaImage(_Model):
     jpeg_quality: int = 85
 
 
+class MediaCard(_Model):
+    """Bookmark link card images (spec 16): downloaded once, shrunk, saved as card.webp."""
+
+    max_bytes: int = 5_242_880
+    max_width: int = 800
+    format: Literal["webp"] = "webp"
+    quality: int = 80
+
+
 class Media(_Model):
     max_bytes: int = 20_971_520
     image: MediaImage = Field(default_factory=MediaImage)
+    card: MediaCard = Field(default_factory=MediaCard)
     # Where uploads go (a Hugo static/ path, so they are served from the site root), and
     # their public URL path. The URL defaults to the path without its leading "static/".
     upload_path: str = "static/media/{yyyy}/{MM}/{md5}.{ext}"
