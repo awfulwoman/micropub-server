@@ -25,6 +25,7 @@ from .target_enrich import (
     card_image,
     enrich_props,
     image_key,
+    refetch_card,
     refresh_props,
 )
 from .templates import render_post
@@ -458,6 +459,7 @@ async def update_post(
     replace: Any = None,
     delete: Any = None,
     draft_mode: bool = False,
+    refetch_card_of: str | None = None,
 ) -> Updated:
     row = _find_post(s, url)
     if row["deleted"]:
@@ -520,6 +522,8 @@ async def update_post(
             props.pop("basedomain", None)
 
     card = await refresh_props(s, props, old)
+    if refetch_card_of:  # asked for: a new card for the same link, from the page as it is now
+        card = await refetch_card(s, props, refetch_card_of) or card
     old_path, old_url = row["path"], row["url"]
     bundle = old_path.endswith("/index.md")
     had_image = bool(card_image(old))

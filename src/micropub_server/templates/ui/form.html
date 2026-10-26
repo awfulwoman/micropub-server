@@ -73,6 +73,21 @@
   </fieldset>
   {% endif %}
 
+  {% if card is not none and editing %}
+  <fieldset>
+    <legend>Link card <span class="hint">shown on the site beside the link</span></legend>
+    {% if card.src %}<img class="card-image" src="{{ card.src }}" alt="{{ card.image.alt }}" loading="lazy" width="240">{% endif %}
+    {% if card.site %}<p><strong>{{ card.site }}</strong></p>{% endif %}
+    {% if card.description %}<p>{{ card.description }}</p>{% endif %}
+    {% if card.image %}
+    <p class="muted"><code>{{ card.image.file }}</code>, {{ card.image.width }} x {{ card.image.height }}</p>
+    <label class="check"><input type="checkbox" name="remove_card_image" value="1"> Remove image</label>
+    {% endif %}
+    {% if not (card.site or card.description or card.image) %}<p class="muted">This {{ type_name|lower }} has no card.</p>{% endif %}
+    <p class="muted">The button at the bottom looks the link up again and replaces the card.</p>
+  </fieldset>
+  {% endif %}
+
   {% if topics %}
   {% set ticked = values.get('topic') if values else prefill.get('topic', []) %}
   <fieldset>
@@ -107,6 +122,7 @@
     {% for value, label, primary in buttons %}
     <button {{ 'class="primary"' | safe if primary }} type="submit" name="{{ button_name }}" value="{{ value }}">{{ label }}</button>
     {% endfor %}
+    {% if card is not none and editing %}<button type="submit" name="card" value="refetch">Fetch the card again</button>{% endif %}
   </div>
 </form>
 {% endblock %}

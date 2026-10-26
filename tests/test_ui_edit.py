@@ -4,8 +4,10 @@ import re
 import pytest
 from ruamel.yaml import YAML
 
+from micropub_server.card_image import CardImage
 from micropub_server.publish import update_post
 from micropub_server.syndication.mastodon import MastodonTarget
+from micropub_server.target_meta import TargetMeta
 
 from .conftest import PASSWORD, jpeg_bytes
 
@@ -304,3 +306,118 @@ def test_share_now_needs_csrf(ui, state):
     state.targets = [MastodonTarget(url=API, user="awfulwoman", token="t")]
     post = make(ui, content="x")
     assert ui.post(f"{post}/syndicate", data={"csrf": "wrong"}).status_code == 403
+
+
+# --- the link card -----------------------------------------------------------------------
+IMG = "https://adactio.com/i/card.jpg"
+LINK = "https://adactio.com/journal/22802"
+BOOKMARK = "content/bookmarks/2026/10/14/1910/index.md"
+LIKE = "content/likes/2026/10/14/1910/index.md"
+CARD_META = TargetMeta(
+    site="Adactio", description="A journal entry.", image_url=IMG, image_alt="A photo"
+)
+WEBP = CardImage(b"RIFF-webp-bytes", 800, 419)
+WEBP_2 = CardImage(b"RIFF-other-bytes", 640, 360)
+
+
+@pytest.fixture
+def carded(ui, targets, images):
+    targets.metas[LINK] = CARD_META
+    images.cards[IMG] = WEBP
+
+
+@pytest.mark.parametrize(
+    ("kind", "path"), [("bookmark", BOOKMARK), ("like", LIKE)], ids=["bookmark", "like"]
+)
+def test_the_edit_form_shows_the_card(ui, carded, kind, path):
+    post = make(ui, kind, **{f"{kind}-of": LINK})
+    html = ui.get(f"{post}/edit").text
+    assert "Adactio" in html and "A journal entry." in html
+    assert 'src="https://awfulwoman.com/' in html and "card.webp" in html
+    assert "800" in html and "419" in html
+    assert 'name="remove_card_image"' in html
+    assert 'name="card" value="refetch"' in html
+
+
+def test_a_bookmark_without_a_card_still_offers_to_fetch_one(ui, targets):
+    post = make(ui, "bookmark", **{"bookmark-of": LINK})
+    html = ui.get(f"{post}/edit").text
+    assert 'name="card" value="refetch"' in html and "remove_card_image" not in html
+
+
+def test_a_like_with_an_embed_shows_no_card_section(ui, targets):
+    toot = "https://masto.example/@ada/1"
+    targets.metas[toot] = TargetMeta(author="Ada", oembed="<iframe></iframe>")
+    post = make(ui, "like", **{"like-of": toot})
+    html = ui.get(f"{post}/edit").text
+    assert 'name="card"' not in html and "remove_card_image" not in html
+
+
+@pytest.mark.parametrize(
+    ("kind", "path"), [("bookmark", BOOKMARK), ("like", LIKE)], ids=["bookmark", "like"]
+)
+def test_ticking_remove_image_deletes_the_image_in_the_same_commit(
+    ui, carded, site, state, monkeypatch, kind, path
+):
+    post = make(ui, kind, **{f"{kind}-of": LINK})
+    card = path.replace("index.md", "card.webp")
+    assert (site / card).exists()
+    commits = []
+    original = state.store.commit
+
+    async def spy(changes, message):
+        commits.append([c.path for c in changes])
+        await original(changes, message)
+
+    monkeypatch.setattr(state.store, "commit", spy)
+    r = edit(ui, post, {f"{kind}-of": LINK, "remove_card_image": "1"})
+    assert r.status_code == 303
+    front, _ = fm(site, path)
+    assert f"{kind}_image" not in front and front[f"{kind}_site"] == "Adactio"
+    assert not (site / card).exists()
+    assert commits == [[path, card]]
+
+
+def test_fetching_the_card_again_replaces_it(ui, carded, site, targets, images):
+    post = make(ui, "bookmark", **{"bookmark-of": LINK})
+    targets.metas[LINK] = TargetMeta(
+        site="New site", description="New text", image_url=IMG, image_alt="New"
+    )
+    images.cards[IMG] = WEBP_2
+    page = ui.get(f"{post}/edit")
+    token = re.search(r'name="csrf" value="([^"]+)"', page.text).group(1)
+    r = ui.post(f"{post}/edit", data={"csrf": token, "bookmark-of": LINK, "card": "refetch"})
+    assert r.status_code == 303 and "Saved" in r.headers["location"]
+    front, _ = fm(site, BOOKMARK)
+    assert front["bookmark_site"] == "New site" and front["bookmark_image"]["width"] == 640
+    assert (site / BOOKMARK.replace("index.md", "card.webp")).read_bytes() == WEBP_2.content
+    assert targets.calls.count(LINK) == 2
+
+
+def test_fetching_again_with_no_image_removes_the_old_one(ui, carded, site, targets, images):
+    post = make(ui, "bookmark", **{"bookmark-of": LINK})
+    targets.metas[LINK] = TargetMeta(site="Plain")
+    page = ui.get(f"{post}/edit")
+    token = re.search(r'name="csrf" value="([^"]+)"', page.text).group(1)
+    ui.post(f"{post}/edit", data={"csrf": token, "bookmark-of": LINK, "card": "refetch"})
+    front, _ = fm(site, BOOKMARK)
+    assert front["bookmark_site"] == "Plain" and "bookmark_description" not in front
+    assert "bookmark_image" not in front
+    assert not (site / BOOKMARK.replace("index.md", "card.webp")).exists()
+
+
+def test_fetching_again_keeps_the_card_when_the_page_does_not_answer(ui, carded, site, targets):
+    post = make(ui, "bookmark", **{"bookmark-of": LINK})
+    del targets.metas[LINK]
+    page = ui.get(f"{post}/edit")
+    token = re.search(r'name="csrf" value="([^"]+)"', page.text).group(1)
+    r = ui.post(f"{post}/edit", data={"csrf": token, "bookmark-of": LINK, "card": "refetch"})
+    assert r.status_code == 303
+    front, _ = fm(site, BOOKMARK)
+    assert front["bookmark_site"] == "Adactio" and front["bookmark_image"]
+
+
+def test_saving_without_touching_the_card_fetches_nothing(ui, carded, targets):
+    post = make(ui, "bookmark", **{"bookmark-of": LINK, "name": "T"})
+    edit(ui, post, {"bookmark-of": LINK, "name": "Changed"})
+    assert targets.calls == [LINK]

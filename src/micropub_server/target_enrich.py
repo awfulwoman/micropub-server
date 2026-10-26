@@ -155,6 +155,50 @@ async def refresh_props(s: AppState, props: dict[str, Any], old: dict[str, Any])
     return card
 
 
+async def refetch_card(s: AppState, props: dict[str, Any], kind: str) -> Card | None:
+    """On "fetch the card again": look up the current link and swap its card in for the old one.
+
+    Only the card keys go (site, description, image and its markers); the other facts stay. When the
+    page gives nothing, the old card is kept. Returns the new image for the caller to commit.
+    """
+    url = _target_url(props.get(TARGET_PROPS[kind]))
+    if not url or kind not in CARD_KINDS or not s.config.publication.fetch_target_meta:
+        return None
+    found, card = await lookup_card(s, kind, url, image=_wants_image(s, kind))
+    if not found:
+        return None
+    for name in (*CARD_TEXT, *CARD_EXTRAS):
+        key = f"{kind}-{name}"
+        props.pop(key, None)
+        _extras(props).pop(key.replace("-", "_"), None)
+    for key, value in found.items():
+        props.setdefault(key, value)
+    return card
+
+
+def card_facts(props: dict[str, Any], kind: str) -> dict[str, Any] | None:
+    """What the edit form shows of a post's card, or None when the kind has no card here.
+
+    A like the site shows as an embed has no card.
+    """
+    if kind not in CARD_KINDS:
+        return None
+    extras = _extras(props)
+
+    def get(name: str) -> Any:
+        key = f"{kind}-{name}"
+        return props.get(key) or extras.get(key.replace("-", "_"))
+
+    if CARD_KINDS[kind] and get("oembed"):
+        return None
+    image = get("image")
+    return {
+        "site": get("site") or "",
+        "description": get("description") or "",
+        "image": image if isinstance(image, dict) and image.get("file") else None,
+    }
+
+
 @dataclass
 class BackfillReport:
     updated: int = 0

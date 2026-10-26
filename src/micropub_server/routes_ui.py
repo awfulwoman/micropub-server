@@ -29,6 +29,7 @@ from .publish import (
     update_post,
 )
 from .queries import _cursor, _decode_cursor, get_categories
+from .target_enrich import CARD_KINDS, card_facts, image_key
 from .ui import page, safe_next, signed_in
 from .util import to_list
 
@@ -256,6 +257,7 @@ async def _form_page(
         button_name="action" if editing else "status",
         editing=editing,
         existing_photos=_photos_of(edit_row) if editing else [],
+        card=_card_of(edit_row) if editing else None,
         fields=type_fields(key, cfg),
         required=set(type_required(key, cfg)),
         links=set(LINKS),
@@ -271,6 +273,19 @@ async def _form_page(
         example_path=edit_row["path"] if editing else cfg.post.path,
         preview_path=f"/posts/new/{key}/preview",
     )
+
+
+def _card_of(row) -> dict[str, Any] | None:
+    """The post's link card as the edit form shows it. The image is served by the site itself."""
+    kind = row["post_type"]
+    card = card_facts(json.loads(row["properties"]), kind)
+    if card is None:
+        return None
+    image = card["image"]
+    if image and row["path"].endswith("/index.md"):
+        card["src"] = urljoin(row["url"], image["file"])
+    card["kind"] = kind
+    return card
 
 
 def _photos_of(row) -> list[dict[str, str]]:
@@ -572,15 +587,21 @@ async def edit_submit(request: Request, session: dict[str, Any]) -> Response:
             replace["mp-syndicate-to"] = chosen
         else:
             delete.append("mp-syndicate-to")
+    kind = key if key in CARD_KINDS else None
+    refetch = kind if kind and form.get("card") == "refetch" else None
+    if kind and form.get("remove_card_image"):
+        delete.append(image_key(kind))
     action = form.get("action")
     if action == "publish" and row["post_status"] != "published":
         replace["post-status"] = ["published"]
     elif action == "draft" and row["post_status"] != "draft":
         replace["post-status"] = ["draft"]
-    if not replace and not delete:
+    if not replace and not delete and not refetch:
         return _back(row["uid"], "Nothing changed.")
     try:
-        done = await update_post(s, row["url"], replace=replace or None, delete=delete or None)
+        done = await update_post(
+            s, row["url"], replace=replace or None, delete=delete or None, refetch_card_of=refetch
+        )
     except MicropubError as exc:
         return await _form_page(
             request, key, cfg, status=502 if exc.error == "store_error" else 422, error=exc.description,
