@@ -83,3 +83,15 @@ def test_card_keys_go_after_bookmark_author_with_a_nested_image():
         "tags:\n  - x\n---\nBody\n"
     )
     assert add_card_to_front_matter(out, card) is None
+
+
+def test_like_card_keys_go_after_like_author():
+    from micropub_server.target_files import add_card_to_front_matter
+
+    text = "---\nlike_of: https://a.example/\nlike_title: T\nlike_author: A\nlike_text: x\n---\n"
+    out = add_card_to_front_matter(text, {"like_site": "S", "like_description": "D"}, "like")
+    assert out == (
+        "---\nlike_of: https://a.example/\nlike_title: T\nlike_author: A\n"
+        "like_site: S\nlike_description: D\nlike_text: x\n---\n"
+    )
+    assert add_card_to_front_matter(out, {"like_site": "S"}, "like") is None

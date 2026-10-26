@@ -60,29 +60,33 @@ def add_to_front_matter(text: str, kind: str, found: dict[str, str]) -> str | No
     return "---\n" + "".join(lines[:j]) + added + "".join(lines[j:]) + text[end + 1 :]
 
 
-CARD_KEYS = ("bookmark_site", "bookmark_description", "bookmark_image")
+def card_keys(kind: str) -> tuple[str, ...]:
+    return tuple(f"{kind}_{name}" for name in ("site", "description", "image"))
 
 
-def add_card_to_front_matter(text: str, card: dict[str, str | dict]) -> str | None:
-    """The bookmark with the link card keys added, or None if there is nothing to do.
+def add_card_to_front_matter(
+    text: str, card: dict[str, str | dict], kind: str = "bookmark"
+) -> str | None:
+    """The post with the link card keys added, or None if there is nothing to do.
 
-    The keys (`bookmark_site`, `bookmark_description`, `bookmark_image`, the last a mapping) go
-    after `bookmark_of` and `bookmark_author`. A bookmark that has any card key is never touched.
+    The keys (`<kind>_site`, `<kind>_description`, `<kind>_image`, the last a mapping) go after
+    `<kind>_of`, `<kind>_title` and `<kind>_author`. A post that has any card key is never touched.
     """
-    wanted = [(key, card[key]) for key in CARD_KEYS if card.get(key)]
+    keys = card_keys(kind)
+    wanted = [(key, card[key]) for key in keys if card.get(key)]
     if not wanted or not text.startswith("---\n"):
         return None
     end = text.find("\n---\n", 3)
     if end == -1:
         return None
     lines = text[4 : end + 1].splitlines(keepends=True)
-    if any(re.match(rf"({'|'.join(CARD_KEYS)})\s*:", line) for line in lines):
+    if any(re.match(rf"({'|'.join(keys)})\s*:", line) for line in lines):
         return None
-    target = next((n for n, line in enumerate(lines) if re.match(r"bookmark_of\s*:", line)), None)
+    target = next((n for n, line in enumerate(lines) if re.match(rf"{kind}_of\s*:", line)), None)
     if target is None:
         return None
     j = _block_end(lines, target)
-    if j < len(lines) and re.match(r"bookmark_author\s*:", lines[j]):
+    while j < len(lines) and re.match(rf"{kind}_(title|author)\s*:", lines[j]):
         j = _block_end(lines, j)
     added = "".join(_dump(key, value) for key, value in wanted)
     return "---\n" + "".join(lines[:j]) + added + "".join(lines[j:]) + text[end + 1 :]

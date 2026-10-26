@@ -41,7 +41,7 @@ post_types:
   like:
     name: Like
     post:
-      path: content/likes/{yyyy}/{MM}/{dd}/{slug}.md
+      path: content/likes/{yyyy}/{MM}/{dd}/{slug}/index.md
       url: likes/{yyyy}/{MM}/{dd}/{slug}/
     properties: [like-of]
     required_properties: [like-of]

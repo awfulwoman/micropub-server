@@ -10,6 +10,7 @@ from .auth.passwords import hash_password
 from .backfill_cards import STEPS
 from .bootstrap import ConfigError, build_state
 from .config import Settings
+from .target_enrich import CARD_KINDS
 from .target_meta import KINDS
 
 
@@ -151,10 +152,10 @@ def _backfill_cards(args) -> int:
     from .config import MediaCard
 
     root = Path(args.checkout)
-    if not (root / "content/bookmarks").is_dir():
-        print(f"no content/bookmarks in {root}", file=sys.stderr)
+    if not (root / f"content/{args.type}s").is_dir():
+        print(f"no content/{args.type}s in {root}", file=sys.stderr)
         return 1
-    report = backfill_scraped(root, MediaCard(), dry_run=args.dry_run)
+    report = backfill_scraped(root, MediaCard(), dry_run=args.dry_run, kind=args.type)
     verb = "would convert" if args.dry_run else "converted"
     print(f"{verb} {report.converted} (text only {report.no_image}), skipped {report.skipped}")
     for path, props in report.changes:
@@ -236,7 +237,10 @@ def main(argv: list[str] | None = None) -> int:
     back.set_defaults(func=_backfill_targets)
     cards = sub.add_parser(
         "backfill-cards",
-        help="add link cards (site, description, image) to the bookmarks of a site checkout",
+        help="add link cards (site, description, image) to the bookmarks or likes of a site checkout",
+    )
+    cards.add_argument(
+        "--type", choices=sorted(CARD_KINDS), default="bookmark", help="bookmark (default) or like"
     )
     cards.add_argument("--checkout", required=True, help="a local checkout of the site repo")
     cards.add_argument(

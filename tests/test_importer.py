@@ -440,3 +440,20 @@ async def test_card_front_matter_round_trips(cards):
     for path, original in ((CARD_PATH, CARD_FM), (GONE_PATH, GONE_FM)):
         props = json.loads(posts(cards)[path]["properties"])
         assert load(render_file(cards, props)) == load(original)
+
+
+async def test_like_card_keys_become_properties_too(state, site):
+    path = "content/likes/2026/10/26/read/index.md"
+    f = site / path
+    f.parent.mkdir(parents=True)
+    f.write_text(
+        "---\ndate: '2026-10-26T09:00:00+01:00'\nlike_of: https://a.example/x\n"
+        "like_site: A\nlike_description: D\nlike_image: {file: card.webp, alt: '', width: 8, height: 4}\n"
+        "like_card: {result: none, checked: 2026-10-26}\n---\n"
+    )
+    await run(state)
+    p = json.loads(posts(state)[path]["properties"])
+    assert (p["like-site"], p["like-description"]) == ("A", "D")
+    assert p["like-image"]["file"] == "card.webp"
+    assert p["like-card"] == {"result": "none", "checked": "2026-10-26"}
+    assert "front-matter" not in p

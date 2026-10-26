@@ -26,21 +26,28 @@ def _target_url(value: Any) -> str:
     return first if isinstance(first, str) else ""
 
 
-CARD_EXTRAS = ("image", "card", "card-archived")  # a bookmark's card keys beyond KINDS (spec 16)
-IMAGE_KEY = "bookmark-image"
+# The kinds that get a link card (spec 16), and whether an embed found for the link replaces it.
+CARD_KINDS = {"bookmark": False, "like": True}
+CARD_EXTRAS = ("image", "card", "card-archived")  # a card kind's keys beyond KINDS
+CARD_TEXT = ("site", "description")  # the text facts of a card, in KINDS
+
+
+def image_key(kind: str) -> str:
+    return f"{kind}-image"
 
 
 def derived_keys(kind: str) -> list[str]:
-    names = [*KINDS[kind], *(CARD_EXTRAS if kind == "bookmark" else ())]
+    names = [*KINDS[kind], *(CARD_EXTRAS if kind in CARD_KINDS else ())]
     return [f"{kind}-{name}" for name in names]
 
 
 @dataclass
 class Card:
-    """A bookmark's downloaded image, waiting to be committed beside its index.md."""
+    """A card kind's downloaded image, waiting to be committed beside its index.md."""
 
     image: CardImage
     alt: str = ""
+    kind: str = "bookmark"
 
     def as_prop(self) -> dict[str, Any]:
         return {
@@ -52,8 +59,12 @@ class Card:
 
 
 def card_image(props: dict[str, Any]) -> Any:
-    """The bookmark-image property, or the same key as an untouched front matter extra."""
-    return props.get(IMAGE_KEY) or _extras(props).get(IMAGE_KEY.replace("-", "_"))
+    """The `<kind>-image` property, or the same key as an untouched front matter extra."""
+    for kind in CARD_KINDS:
+        key = image_key(kind)
+        if image := props.get(key) or _extras(props).get(key.replace("-", "_")):
+            return image
+    return None
 
 
 def _extras(props: dict[str, Any]) -> dict[str, Any]:
@@ -74,6 +85,9 @@ async def lookup_card(s: AppState, kind: str, url: str, *, image: bool = False):
     try:
         meta = await s.target_fetcher(url, s.resolver)
         found = meta.as_props(kind)
+        if meta.oembed and CARD_KINDS.get(kind):  # the site shows the embed, so no card
+            found = {k: v for k, v in found.items() if k.removeprefix(f"{kind}-") not in CARD_TEXT}
+            image = False
     except Exception:  # a bug or a hostile page must never stop a post being saved
         log.exception("could not read %s", url)
         return {}, None
@@ -85,7 +99,7 @@ async def lookup_card(s: AppState, kind: str, url: str, *, image: bool = False):
         except Exception:  # the same: the card just has no image
             log.exception("could not fetch the image %s", meta.image_url)
             fetched = None
-        card = Card(fetched, meta.image_alt) if fetched else None
+        card = Card(fetched, meta.image_alt, kind) if fetched else None
     return found, card
 
 
@@ -95,13 +109,13 @@ async def lookup(s: AppState, kind: str, url: str) -> dict[str, str]:
 
 
 def _wants_image(s: AppState, kind: str) -> bool:
-    return kind == "bookmark" and s.config.publication.fetch_target_image
+    return kind in CARD_KINDS and s.config.publication.fetch_target_image
 
 
 async def enrich_props(s: AppState, props: dict[str, Any]) -> Card | None:
     """On create: fetch each link target and fill the gaps the client left.
 
-    Returns a bookmark's card image for the caller to commit; it is not yet in `props`.
+    Returns a card image for the caller to commit; it is not yet in `props`.
     """
     card = None
     if not s.config.publication.fetch_target_meta:
@@ -110,7 +124,7 @@ async def enrich_props(s: AppState, props: dict[str, Any]) -> Card | None:
         url = _target_url(props.get(prop))
         if url:
             found, fetched = await lookup_card(
-                s, kind, url, image=_wants_image(s, kind) and IMAGE_KEY not in props
+                s, kind, url, image=_wants_image(s, kind) and image_key(kind) not in props
             )
             for key, value in found.items():
                 props.setdefault(key, value)
@@ -133,7 +147,7 @@ async def refresh_props(s: AppState, props: dict[str, Any], old: dict[str, Any])
         url = _target_url(props.get(prop))
         if url:
             found, fetched = await lookup_card(
-                s, kind, url, image=_wants_image(s, kind) and IMAGE_KEY not in props
+                s, kind, url, image=_wants_image(s, kind) and image_key(kind) not in props
             )
             for key, value in found.items():
                 props.setdefault(key, value)

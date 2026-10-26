@@ -54,7 +54,7 @@ CONFIG = {
         "like": {
             "name": "Like",
             "post": {
-                "path": "content/likes/{yyyy}/{MM}/{dd}/{HH}{mm}.md",
+                "path": "content/likes/{yyyy}/{MM}/{dd}/{HH}{mm}/index.md",
                 "url": "likes/{yyyy}/{MM}/{dd}/{HH}{mm}/",
             },
         },

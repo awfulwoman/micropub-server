@@ -19,7 +19,14 @@ from .deploys import record as record_deploy
 from .media import Processed
 from .posts import discover_post_type, normalise, render_template
 from .stores import Delete, Move, Put, StoreError
-from .target_enrich import IMAGE_KEY, Card, card_image, enrich_props, refresh_props
+from .target_enrich import (
+    CARD_KINDS,
+    Card,
+    card_image,
+    enrich_props,
+    image_key,
+    refresh_props,
+)
 from .templates import render_post
 from .topics import MAX_TOPICS, topics_for_tags
 from .update import UpdateError, apply_update
@@ -319,7 +326,7 @@ async def create_post(
 
     media_changes, media_actions = await _place_media(s, props, path, url, uploads, uid)
     if card and path.endswith("/index.md"):  # the image needs a bundle; otherwise text only
-        props[IMAGE_KEY] = card.as_prop()
+        props[image_key(card.kind)] = card.as_prop()
         change, action = _card_media(s, card, path, url, uid)
         media_changes.append(change)
         media_actions.append(action)
@@ -486,8 +493,9 @@ async def update_post(
         now=s.clock(),
     )
     _set_topics(s, props, explicit_topics, derive="category" in touched)
-    if IMAGE_KEY in _keys(delete):  # an image the file had before the server knew of it
-        props.get("front-matter", {}).pop(IMAGE_KEY.replace("-", "_"), None)
+    for kind in CARD_KINDS:
+        if image_key(kind) in _keys(delete):  # an image the file had before the server knew of it
+            props.get("front-matter", {}).pop(image_key(kind).replace("-", "_"), None)
     # An edit only changes a post's type if it changes what discovery says about it. Otherwise a
     # note with a title (which discovery calls an article) would jump sections on its first edit.
     # A title alone never counts: on this site notes may have titles too.
@@ -516,7 +524,7 @@ async def update_post(
     bundle = old_path.endswith("/index.md")
     had_image = bool(card_image(old))
     if card and bundle:
-        props[IMAGE_KEY] = card.as_prop()
+        props[image_key(card.kind)] = card.as_prop()
     else:
         card = None
 

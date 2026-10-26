@@ -33,11 +33,12 @@ _LINKS = {
     "in_reply_to": "in-reply-to",
     "quote_of": "quotation-of",
 }
+_CARD_KINDS = ("bookmark", "like")  # link cards (spec 16)
 _CARD_TEXT = {
-    "bookmark_site": "bookmark-site",
-    "bookmark_description": "bookmark-description",
-    "bookmark_card_archived": "bookmark-card-archived",
-}  # link card facts (spec 16); the image and the marker are mappings, handled below
+    f"{kind}_{name.replace('-', '_')}": f"{kind}-{name}"
+    for kind in _CARD_KINDS
+    for name in ("site", "description", "card-archived")
+}  # the image and the marker are mappings, handled below
 _TOKEN_PATTERNS = {
     "yyyy": r"\d{4}",
     "MM": r"\d{2}",
@@ -194,11 +195,14 @@ def _front_matter_to_jf2(
     for key, jf2_key in _CARD_TEXT.items():
         if key in fm:
             props[jf2_key] = str(fm.pop(key))
-    if isinstance(fm.get("bookmark_image"), dict) and fm["bookmark_image"].get("file"):
-        props["bookmark-image"] = fm.pop("bookmark_image")
-    if isinstance(fm.get("bookmark_card"), dict):
-        # `checked` is a bare YAML date: keep it as the same text, not a date object
-        props["bookmark-card"] = {k: _as_card_value(v) for k, v in fm.pop("bookmark_card").items()}
+    for kind in _CARD_KINDS:
+        if isinstance(fm.get(f"{kind}_image"), dict) and fm[f"{kind}_image"].get("file"):
+            props[f"{kind}-image"] = fm.pop(f"{kind}_image")
+        if isinstance(fm.get(f"{kind}_card"), dict):
+            # `checked` is a bare YAML date: keep it as the same text, not a date object
+            props[f"{kind}-card"] = {
+                k: _as_card_value(v) for k, v in fm.pop(f"{kind}_card").items()
+            }
     if fm.pop("draft", False) is True:
         props["post-status"] = "draft"
 

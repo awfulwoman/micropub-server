@@ -163,3 +163,28 @@ def test_cli_prints_counts_and_honours_dry_run(tmp_path, capsys):
     assert main(["backfill-cards", "--checkout", str(copy), "--step", "scraped"]) == 0
     assert "converted 1" in capsys.readouterr().out
     assert (copy / BUNDLE / "card.webp").exists()
+
+
+def test_type_like_on_the_scraped_step_is_a_no_op(tmp_path, capsys):
+    bundle = make(tmp_path, og=og_with_image(), image=jpeg())  # a bookmark: must stay as it is
+    like = tmp_path / "content/likes/2021/07/07/x"
+    like.mkdir(parents=True)
+    (like / "index.md").write_text("---\nlike_of: https://a.example/\ndate: '2021-07-07'\n---\n")
+    before = {p: p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()}
+    args = ["backfill-cards", "--checkout", str(tmp_path), "--step", "scraped", "--type", "like"]
+    assert main(args) == 0
+    assert "converted 0" in capsys.readouterr().out
+    assert {p: p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()} == before
+    assert (bundle / "scraped").exists()
+
+
+def test_scraped_data_in_a_like_bundle_converts_with_like_keys(tmp_path):
+    like = tmp_path / "content/likes/2021/07/07/x"
+    (like / "scraped").mkdir(parents=True)
+    (like / "index.md").write_text("---\nlike_of: https://a.example/\nlike_title: T\n---\n")
+    (like / "scraped/opengraph.json").write_text(json.dumps({"siteName": "A", "description": "D"}))
+    report = backfill_scraped(tmp_path, CFG, kind="like")
+    assert report.converted == 1
+    assert list(front(like / "index.md")) == [
+        "like_of", "like_title", "like_site", "like_description",
+    ]  # fmt: skip

@@ -137,7 +137,7 @@ directory structure, because `hugo.yaml` only sets a permalink for `posts`.
 | article | `content/posts/{yyyy}/{MM}/{dd}/{slug}/index.md` | `posts/{slug}/` | yes |
 | note | `content/notes/{yyyy}/{MM}/{dd}/{slug}.md` | `notes/{yyyy}/{MM}/{dd}/{slug}/` | no |
 | bookmark | `content/bookmarks/{yyyy}/{MM}/{dd}/{slug}/index.md` | `bookmarks/{yyyy}/{MM}/{dd}/{slug}/` | yes (link card image, [16](16-link-cards.md)) |
-| like | `content/likes/{yyyy}/{MM}/{dd}/{slug}.md` | `likes/{yyyy}/{MM}/{dd}/{slug}/` | no |
+| like | `content/likes/{yyyy}/{MM}/{dd}/{slug}/index.md` | `likes/{yyyy}/{MM}/{dd}/{slug}/` | yes (link card image, [16](16-link-cards.md)) |
 | reply | `content/replies/{yyyy}/{MM}/{dd}/{slug}.md` | `replies/{yyyy}/{MM}/{dd}/{slug}/` | no |
 | repost | `content/reposts/{yyyy}/{MM}/{dd}/{slug}.md` | `reposts/{yyyy}/{MM}/{dd}/{slug}/` | no |
 | quote | `content/quotes/{yyyy}/{MM}/{dd}/{slug}.md` | `quotes/{yyyy}/{MM}/{dd}/{slug}/` | no |
@@ -234,7 +234,8 @@ a changed link throws away the old page's values first.
 
 | Kind | Saved |
 | --- | --- |
-| like, quote | `title`, `author`, `text`, `oembed` |
+| like | `title`, `author`, `text`, `oembed`, and, when there is no embed, the link card: `site`, `description`, `image` ([16](16-link-cards.md#likes)) |
+| quote | `title`, `author`, `text`, `oembed` |
 | bookmark | `author` (it already has its own title), and the link card: `site`, `description`, `image` ([16](16-link-cards.md)) |
 
 How each is found, best source first:

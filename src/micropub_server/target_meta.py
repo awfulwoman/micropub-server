@@ -32,7 +32,7 @@ USER_AGENT = "micropub-server link metadata"
 
 # Which front matter prefix each kind of post uses, and which facts it keeps.
 KINDS = {
-    "like": ("title", "author", "text", "oembed"),
+    "like": ("title", "author", "text", "oembed", "site", "description"),  # card: spec 16
     "quote": ("title", "author", "text", "oembed"),
     "bookmark": ("author", "site", "description"),  # a bookmark already has its own title
 }

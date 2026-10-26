@@ -18,7 +18,9 @@ _FRONT = ["title", "date", "lastmod", "draft"]
 _TYPE_SPECIFIC = [
     "bookmark_of", "basedomain", "bookmark_author", "bookmark_site", "bookmark_description",
     "bookmark_image", "bookmark_card", "bookmark_card_archived",
-    "like_of", "like_title", "like_author", "like_text", "like_oembed",
+    "like_of", "like_title", "like_author",
+    "like_site", "like_description", "like_image", "like_card", "like_card_archived",
+    "like_text", "like_oembed",
     "repost_of", "in_reply_to",
     "quote_of", "quote_title", "quote_author", "quote_text", "quote_oembed",
     "place_name", "place_geo",

@@ -7,7 +7,7 @@ from micropub_server.target_meta import TargetMeta
 
 from .conftest import sign_in
 
-LIKE = "content/likes/2026/10/14/1910.md"
+LIKE = "content/likes/2026/10/14/1910/index.md"
 QUOTE = "content/quotes/2026/10/14/1910.md"
 BOOKMARK = "content/bookmarks/2026/10/14/1910/index.md"
 CARD = "content/bookmarks/2026/10/14/1910/card.webp"
@@ -233,10 +233,11 @@ def test_a_flat_bookmark_gets_text_only(client, full, site, targets, images, sta
     assert not list(site.rglob("card.webp"))
 
 
-def test_only_bookmarks_get_an_image(client, full, site, targets, images):
+def test_quotes_get_no_card_or_image(client, full, site, targets, images):
     targets.metas[ADACTIO] = CARD_META
     images.cards[IMG] = WEBP
-    make(client, full, **{"like-of": ADACTIO})
+    make(client, full, **{"quotation-of": ADACTIO})
+    assert "quote_site" not in fm(site, QUOTE)
     assert images.calls == []
 
 
@@ -390,3 +391,90 @@ def test_card_keys_sit_next_to_bookmark_of(client, full, site, targets, images):
     start = keys.index("bookmark_of")
     assert keys[start + 1] == "basedomain"
     assert [k for k in keys[start:] if k != "basedomain"] == wanted
+
+
+# --- link cards for likes (spec 16, Likes) -----------------------------------------------------
+LIKE_CARD = "content/likes/2026/10/14/1910/card.webp"
+
+
+def like(client, full, **extra):
+    return make(client, full, **{"like-of": ADACTIO, **extra})
+
+
+def test_a_like_gets_its_card_in_one_commit(
+    client, full, site, targets, images, state, monkeypatch
+):
+    targets.metas[ADACTIO] = CARD_META
+    images.cards[IMG] = WEBP
+    commits = []
+    original = state.store.commit
+
+    async def spy(changes, message):
+        commits.append(([c.path for c in changes], message))
+        return await original(changes, message)
+
+    monkeypatch.setattr(state.store, "commit", spy)
+    like(client, full)
+    front = fm(site, LIKE)
+    assert (front["like_site"], front["like_description"]) == ("Adactio", "A journal entry.")
+    assert front["like_image"] == {
+        "file": "card.webp",
+        "alt": "A photo",
+        "width": 800,
+        "height": 419,
+    }
+    assert (site / LIKE_CARD).read_bytes() == WEBP.content
+    assert commits == [([LIKE, LIKE_CARD], "create like post")]
+    (row,) = media_rows(state)
+    assert row["path"] == LIKE_CARD and row["post_uid"]
+
+
+def test_a_like_with_an_embed_gets_no_card(client, full, site, targets, images, state):
+    targets.metas[TOOT] = TargetMeta(
+        author="Ada",
+        text="hello",
+        oembed="<blockquote>hi</blockquote>",
+        site="Mastodon",
+        description="hello",
+        image_url=IMG,
+    )
+    images.cards[IMG] = WEBP
+    make(client, full, **{"like-of": TOOT})
+    front = fm(site, LIKE)
+    assert front["like_oembed"] and front["like_author"] == "Ada"
+    assert not {"like_site", "like_description", "like_image"} & set(front)
+    assert images.calls == [] and media_rows(state) == []
+
+
+def test_like_card_keys_follow_like_author(client, full, site, targets, images):
+    targets.metas[ADACTIO] = TargetMeta(
+        title="T", author="Jeremy", site="S", description="D", image_url=IMG
+    )
+    images.cards[IMG] = WEBP
+    like(client, full)
+    keys = list(fm(site, LIKE))
+    start = keys.index("like_of")
+    assert keys[start : start + 6] == [
+        "like_of", "like_title", "like_author", "like_site", "like_description", "like_image",
+    ]  # fmt: skip
+
+
+def test_deleting_like_image_removes_the_file(client, full, site, targets, images, state):
+    targets.metas[ADACTIO] = CARD_META
+    images.cards[IMG] = WEBP
+    url = like(client, full)
+    assert update(client, full, url, delete=["like-image"]).status_code == 200
+    front = fm(site, LIKE)
+    assert "like_image" not in front and front["like_site"] == "Adactio"
+    assert not (site / LIKE_CARD).exists() and media_rows(state) == []
+
+
+def test_changing_the_like_replaces_the_card(client, full, site, targets, images):
+    targets.metas[ADACTIO] = CARD_META
+    targets.metas["https://two.example/b"] = TargetMeta(site="Two", description="Second")
+    images.cards[IMG] = WEBP
+    url = like(client, full)
+    update(client, full, url, replace={"like-of": ["https://two.example/b"]})
+    front = fm(site, LIKE)
+    assert front["like_site"] == "Two" and "like_image" not in front
+    assert not (site / LIKE_CARD).exists()

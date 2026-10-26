@@ -17,7 +17,7 @@ def create(client, bearer, **kw):
 def test_like(client, bearer, site):
     url = create(client, bearer, data={"like-of": "https://example.com/post"})
     assert url == "https://awfulwoman.com/likes/2026/10/14/1910/"
-    front, body = fm(site, "content/likes/2026/10/14/1910.md")
+    front, body = fm(site, "content/likes/2026/10/14/1910/index.md")
     assert front["like_of"] == "https://example.com/post" and body.strip() == ""
 
 

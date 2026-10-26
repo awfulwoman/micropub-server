@@ -24,7 +24,7 @@ MAX_DESCRIPTION_CHARS = 300
 
 @dataclass
 class Report:
-    converted: int = 0  # bookmarks that got card keys (or would, in a dry run)
+    converted: int = 0  # posts that got card keys (or would, in a dry run)
     skipped: int = 0  # already have card keys, or nothing usable in the json
     no_image: int = 0  # of the converted, those that got text keys only
     changes: list[tuple[str, dict]] = field(default_factory=list)
@@ -43,10 +43,12 @@ def _image(bundle: Path, og: dict, card: MediaCard):
         return None
 
 
-def backfill_scraped(root: Path, card: MediaCard, dry_run: bool = False) -> Report:
-    """Convert every bookmark bundle under root/content/bookmarks that has a `scraped/` directory."""
+def backfill_scraped(
+    root: Path, card: MediaCard, dry_run: bool = False, kind: str = "bookmark"
+) -> Report:
+    """Convert every bundle under root/content/<kind>s that has a `scraped/` directory."""
     report = Report()
-    for og_path in sorted((root / "content/bookmarks").rglob("scraped/opengraph.json")):
+    for og_path in sorted((root / f"content/{kind}s").rglob("scraped/opengraph.json")):
         bundle = og_path.parent.parent
         post = bundle / "index.md"
         try:
@@ -60,17 +62,17 @@ def backfill_scraped(root: Path, card: MediaCard, dry_run: bool = False) -> Repo
             continue
         image = _image(bundle, og, card)
         props: dict[str, str | dict] = {
-            "bookmark_site": _clean(og.get("siteName"), MAX_SITE_CHARS),
-            "bookmark_description": _clean(og.get("description"), MAX_DESCRIPTION_CHARS),
+            f"{kind}_site": _clean(og.get("siteName"), MAX_SITE_CHARS),
+            f"{kind}_description": _clean(og.get("description"), MAX_DESCRIPTION_CHARS),
         }
         if image:  # alt is empty: the image sits next to the title, inside the same link
-            props["bookmark_image"] = {
+            props[f"{kind}_image"] = {
                 "file": image.filename,
                 "alt": "",
                 "width": image.width,
                 "height": image.height,
             }
-        updated = add_card_to_front_matter(text, props)
+        updated = add_card_to_front_matter(text, props, kind)
         if updated is None:
             report.skipped += 1
             continue
