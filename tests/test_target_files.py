@@ -66,3 +66,20 @@ def test_kind_comes_from_the_section():
     assert kind_of_path("content/quotes/2021/06/10/x/index.md") == "quote"
     assert kind_of_path("content/bookmarks/2025/01/04/x.md") == "bookmark"
     assert kind_of_path("content/notes/2025/01/04/x.md") is None
+
+
+def test_card_keys_go_after_bookmark_author_with_a_nested_image():
+    from micropub_server.target_files import add_card_to_front_matter
+
+    text = "---\nbookmark_of: https://x.org/\nbookmark_author: A\ntags:\n  - x\n---\nBody\n"
+    card = {
+        "bookmark_site": "X",
+        "bookmark_image": {"file": "card.webp", "alt": "", "width": 800, "height": 419},
+    }
+    out = add_card_to_front_matter(text, card)
+    assert out == (
+        "---\nbookmark_of: https://x.org/\nbookmark_author: A\nbookmark_site: X\n"
+        "bookmark_image:\n  file: card.webp\n  alt: ''\n  width: 800\n  height: 419\n"
+        "tags:\n  - x\n---\nBody\n"
+    )
+    assert add_card_to_front_matter(out, card) is None

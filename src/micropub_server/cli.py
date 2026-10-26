@@ -1,4 +1,4 @@
-"""Command line: serve, hash-password, check, migrate, token, import, backfill-targets."""
+"""Command line: serve, hash-password, check, migrate, token, import, backfill-targets, backfill-cards."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ import getpass
 import sys
 
 from .auth.passwords import hash_password
+from .backfill_cards import STEPS
 from .bootstrap import ConfigError, build_state
 from .config import Settings
 from .target_meta import KINDS
@@ -143,6 +144,26 @@ def _backfill_targets(args) -> int:
     return 1 if report.failed else 0
 
 
+def _backfill_cards(args) -> int:
+    from pathlib import Path
+
+    from .backfill_cards import backfill_scraped
+    from .config import MediaCard
+
+    root = Path(args.checkout)
+    if not (root / "content/bookmarks").is_dir():
+        print(f"no content/bookmarks in {root}", file=sys.stderr)
+        return 1
+    report = backfill_scraped(root, MediaCard(), dry_run=args.dry_run)
+    verb = "would convert" if args.dry_run else "converted"
+    print(f"{verb} {report.converted} (text only {report.no_image}), skipped {report.skipped}")
+    for path, props in report.changes:
+        print(f"  {path}")
+        for key, value in props.items():
+            print(f"    {key}: {str(value)[:80]!r}")
+    return 0
+
+
 def _serve(_args) -> int:
     import uvicorn
 
@@ -213,6 +234,21 @@ def main(argv: list[str] | None = None) -> int:
     )
     back.add_argument("--type", choices=sorted(KINDS), help="only this post type, e.g. like")
     back.set_defaults(func=_backfill_targets)
+    cards = sub.add_parser(
+        "backfill-cards",
+        help="add link cards (site, description, image) to the bookmarks of a site checkout",
+    )
+    cards.add_argument("--checkout", required=True, help="a local checkout of the site repo")
+    cards.add_argument(
+        "--step",
+        required=True,
+        choices=STEPS,
+        help="scraped: the old scraped/ cards, with no network",
+    )
+    cards.add_argument(
+        "--dry-run", action="store_true", help="show what would be written, change nothing"
+    )
+    cards.set_defaults(func=_backfill_cards)
     args = parser.parse_args(argv)
     return (args.func if getattr(args, "func", None) else _serve)(args)
 
