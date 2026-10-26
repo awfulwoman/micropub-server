@@ -233,6 +233,39 @@ def test_a_flat_bookmark_gets_text_only(client, full, site, targets, images, sta
     assert not list(site.rglob("card.webp"))
 
 
+def flat_bookmark(client, full, state):
+    """A bookmark made while the site still used flat files, before spec 16's bundles."""
+    cfg = state.config.post_types["bookmark"].post
+    bundle_path, cfg.path = cfg.path, "content/bookmarks/2026/10/14/1910.md"
+    url = bookmark(client, full)
+    cfg.path = bundle_path
+    return url
+
+
+def test_editing_a_flat_bookmark_moves_it_to_a_bundle(client, full, site, targets, state):
+    targets.metas[ADACTIO] = CARD_META
+    url = flat_bookmark(client, full, state)
+    r = update(client, full, url, replace={"content": ["hi"]})
+    assert r.status_code == 200, r.text
+    assert not (site / "content/bookmarks/2026/10/14/1910.md").exists()
+    assert fm(site, BOOKMARK)["bookmark_site"] == "Adactio"
+    (row,) = state.db.query("SELECT url, path FROM posts")
+    assert (row["url"], row["path"]) == (url, BOOKMARK)  # same address, no alias needed
+    assert "aliases" not in fm(site, BOOKMARK)
+
+
+def test_a_flat_bookmark_gets_its_card_image_when_it_moves(
+    client, full, site, targets, images, state
+):
+    url = flat_bookmark(client, full, state)
+    targets.metas["https://two.example/b"] = CARD_META
+    images.cards[IMG] = WEBP
+    update(client, full, url, replace={"bookmark-of": ["https://two.example/b"]})
+    assert fm(site, BOOKMARK)["bookmark_image"]["file"] == "card.webp"
+    assert (site / CARD).read_bytes() == WEBP.content
+    assert [m["path"] for m in media_rows(state)] == [CARD]
+
+
 def test_quotes_get_no_card_or_image(client, full, site, targets, images):
     targets.metas[ADACTIO] = CARD_META
     images.cards[IMG] = WEBP

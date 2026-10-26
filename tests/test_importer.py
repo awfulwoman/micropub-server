@@ -361,7 +361,7 @@ def test_editing_a_bookmark_drops_its_old_basedomain(client, imported, site):
         headers=imported,
     )
     assert r.status_code == 200, r.text
-    front, _ = fm(site, "content/bookmarks/2025/01/23/1059.md")
+    front, _ = fm(site, "content/bookmarks/2025/01/23/1059/index.md")  # flat, so now a bundle
     assert front["tags"] == ["old"] and "basedomain" not in front
 
 
@@ -469,3 +469,15 @@ async def test_like_card_keys_become_properties_too(state, site):
     assert p["like-image"]["file"] == "card.webp"
     assert p["like-card"] == {"result": "none", "checked": "2026-10-26"}
     assert "front-matter" not in p
+
+
+async def test_a_flat_file_moved_into_a_bundle_keeps_its_row(populated, site):
+    await run(populated)
+    flat = "content/bookmarks/2025/01/23/1059.md"
+    before = posts(populated)[flat]
+    (site / "content/bookmarks/2025/01/23/1059").mkdir()
+    (site / flat).rename(site / "content/bookmarks/2025/01/23/1059/index.md")
+    await run(populated)
+    after = posts(populated)["content/bookmarks/2025/01/23/1059/index.md"]
+    assert (after["uid"], after["url"]) == (before["uid"], before["url"])
+    assert flat not in posts(populated)

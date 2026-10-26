@@ -377,8 +377,17 @@ def _store(
         with s.db.transaction():
             if row:
                 s.db.execute(
-                    "UPDATE posts SET post_type=?, post_status=?, published=?, updated=?, properties=? WHERE uid=?",
-                    (type_name, status, published, props.get("updated"), payload, props["uid"]),
+                    "UPDATE posts SET path=?, post_type=?, post_status=?, published=?, updated=?,"
+                    " properties=? WHERE uid=?",  # path: a flat file may have moved into a bundle
+                    (
+                        path,
+                        type_name,
+                        status,
+                        published,
+                        props.get("updated"),
+                        payload,
+                        props["uid"],
+                    ),
                 )
             else:
                 s.db.execute(

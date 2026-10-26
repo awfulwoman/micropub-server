@@ -517,8 +517,11 @@ async def update_post(
         card = await refetch_card(s, props, refetch_card_of) or card
     old_path, old_url = row["path"], row["url"]
     bundle = old_path.endswith("/index.md")
+    # A flat bookmark or like from before spec 16 moves into a bundle, at the same address, so it
+    # can hold a card image.
+    to_bundle = post_type in CARD_KINDS and not bundle and cfg.post.path.endswith("/index.md")
     had_image = bool(card_image(old))
-    if card and bundle:
+    if card and (bundle or to_bundle):
         props[image_key(card.kind)] = card.as_prop()
     else:
         card = None
@@ -531,7 +534,7 @@ async def update_post(
     same_file = render_post(_comparable(props) | {"url": ""}, s.template) == render_post(
         _comparable(old) | {"url": ""}, s.template
     )
-    if same_file and not shape_changed:
+    if same_file and not shape_changed and not to_bundle:
         if _comparable_all(props) != _comparable_all(old):
             # only server-side commands changed (mp-syndicate-to ...): save them, nothing to commit
             s.db.execute(
@@ -542,6 +545,8 @@ async def update_post(
 
     if shape_changed:
         new_path, new_url = await _choose_path(s, props, post_type, cfg, exclude_uid=row["uid"])
+    elif to_bundle:
+        new_path, new_url = old_path.removesuffix(".md") + "/index.md", old_url
     else:
         new_path, new_url = old_path, old_url
     moved = new_path != old_path
@@ -615,7 +620,7 @@ async def update_post(
         for action in card_actions:
             record_media(s, action[1], action[2])
         record_deploy(s, sha, row["uid"], "update")
-    return Updated(url=new_url, changed=True, moved=moved or new_url != old_url)
+    return Updated(url=new_url, changed=True, moved=new_url != old_url)
 
 
 async def delete_post(s: AppState, url: str) -> str:
