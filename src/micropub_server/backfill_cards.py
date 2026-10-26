@@ -508,7 +508,7 @@ async def backfill_cards_server(
     sleep: Sleep = asyncio.sleep,
     today: str | None = None,
 ) -> CardReport:
-    """`live` or `archive` on the posts of this kind in the database, each saved as an edit.
+    """`live` or `archive` on the posts of this kind the server created, each saved as an edit.
 
     The decisions are the checkout mode's (`wants_live`, `live_outcome` ...). One commit each, with
     `card.webp` in it. A dry run fetches and reports but writes nothing. Raises ValueError for
@@ -532,11 +532,14 @@ async def backfill_cards_server(
 
     report, throttle, tried = CardReport(), _Throttle(delay, sleep), 0
     rows = s.db.query(
-        "SELECT url, properties, published FROM posts WHERE deleted IS NULL AND post_type = ?"
-        " ORDER BY published",
+        "SELECT url, properties, published, source FROM posts"
+        " WHERE deleted IS NULL AND post_type = ? ORDER BY published",
         (kind,),
     )
     for row in rows:
+        if row["source"] == "import":  # checkout mode does these, so the two never edit one file
+            report.skipped += 1
+            continue
         props = json.loads(row["properties"])
         extras = props.get("front-matter")
         front = {k.replace("-", "_"): v for k, v in props.items()} | (

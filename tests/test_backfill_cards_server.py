@@ -92,6 +92,18 @@ async def test_live_saves_a_found_card_as_one_edit_with_its_image(
     )
 
 
+async def test_imported_posts_are_left_to_checkout_mode(client, full, site, images, state, commits):
+    bookmark(client, full)
+    state.db.execute("UPDATE posts SET source = 'import'")
+    images.cards[PIC] = WEBP
+    commits.clear()
+    with respx.mock as router:
+        router.get(PAGE_URL).respond(200, html=PAGE)
+        report = await run(state)
+    assert (report.found, report.skipped) == (0, 1)
+    assert commits == []
+
+
 async def test_dry_run_reports_and_writes_nothing(client, full, site, images, state, commits):
     bookmark(client, full)
     images.cards[PIC] = WEBP
