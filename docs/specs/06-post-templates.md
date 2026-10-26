@@ -101,6 +101,7 @@ The defaults below match awfulwoman.com today. They are the first contents of
 | `summary` | `description` | |
 | `category` | `tags` | list |
 | `bookmark-of` | `bookmark_of` | plus `basedomain`: the host of the URL without `www.` |
+| `bookmark-site`, `bookmark-description`, `bookmark-image`, `bookmark-card`, `bookmark-card-archived` | `bookmark_site` … | the link card ([16](16-link-cards.md)); `bookmark_image` is `{file, alt, width, height}` and `card.webp` is committed beside `index.md` |
 | `like-of` | `like_of` | |
 | `repost-of` | `repost_of` | |
 | `in-reply-to` | `in_reply_to` | |
@@ -135,7 +136,7 @@ directory structure, because `hugo.yaml` only sets a permalink for `posts`.
 | --- | --- | --- | --- |
 | article | `content/posts/{yyyy}/{MM}/{dd}/{slug}/index.md` | `posts/{slug}/` | yes |
 | note | `content/notes/{yyyy}/{MM}/{dd}/{slug}.md` | `notes/{yyyy}/{MM}/{dd}/{slug}/` | no |
-| bookmark | `content/bookmarks/{yyyy}/{MM}/{dd}/{slug}.md` | `bookmarks/{yyyy}/{MM}/{dd}/{slug}/` | no |
+| bookmark | `content/bookmarks/{yyyy}/{MM}/{dd}/{slug}/index.md` | `bookmarks/{yyyy}/{MM}/{dd}/{slug}/` | yes (link card image, [16](16-link-cards.md)) |
 | like | `content/likes/{yyyy}/{MM}/{dd}/{slug}.md` | `likes/{yyyy}/{MM}/{dd}/{slug}/` | no |
 | reply | `content/replies/{yyyy}/{MM}/{dd}/{slug}.md` | `replies/{yyyy}/{MM}/{dd}/{slug}/` | no |
 | repost | `content/reposts/{yyyy}/{MM}/{dd}/{slug}.md` | `reposts/{yyyy}/{MM}/{dd}/{slug}/` | no |

@@ -1,6 +1,7 @@
 import pytest
 from ruamel.yaml import YAML
 
+from micropub_server.card_image import CardImage
 from micropub_server.target_enrich import backfill_targets
 from micropub_server.target_meta import TargetMeta
 
@@ -8,13 +9,25 @@ from .conftest import sign_in
 
 LIKE = "content/likes/2026/10/14/1910.md"
 QUOTE = "content/quotes/2026/10/14/1910.md"
-BOOKMARK = "content/bookmarks/2026/10/14/1910.md"
+BOOKMARK = "content/bookmarks/2026/10/14/1910/index.md"
+CARD = "content/bookmarks/2026/10/14/1910/card.webp"
+BOOKMARK_URL = "https://awfulwoman.com/bookmarks/2026/10/14/1910/"
+IMG = "https://adactio.com/i/card.jpg"
 ADACTIO = "https://adactio.com/journal/22802"
 TOOT = "https://masto.example/@ada/1"
 META = TargetMeta(title="The real title", author="Jeremy Keith")
 TOOT_META = TargetMeta(
     author="Ada", text="hello world", oembed='<iframe src="https://masto.example/e"></iframe>'
 )
+CARD_META = TargetMeta(
+    author="Jeremy Keith",
+    site="Adactio",
+    description="A journal entry.",
+    image_url=IMG,
+    image_alt="A photo",
+)
+WEBP = CardImage(b"RIFF-webp-bytes", 800, 419)
+WEBP_2 = CardImage(b"RIFF-other-bytes", 640, 360)
 
 
 def fm(site, path):
@@ -111,6 +124,207 @@ def test_changing_the_target_replaces_what_was_fetched(client, full, site, targe
     assert "like_author" not in front  # the old author belonged to the old page
 
 
+# --- link cards (spec 16) ------------------------------------------------------------------------
+def bookmark(client, full, **extra):
+    return make(client, full, **{"bookmark-of": ADACTIO, "name": "b", **extra})
+
+
+def media_rows(state):
+    return state.db.query("SELECT * FROM media ORDER BY path")
+
+
+def test_a_bookmark_gets_its_card_in_one_commit(
+    client, full, site, targets, images, state, monkeypatch
+):
+    targets.metas[ADACTIO] = CARD_META
+    images.cards[IMG] = WEBP
+    commits = []
+    original = state.store.commit
+
+    async def spy(changes, message):
+        commits.append(([c.path for c in changes], message))
+        return await original(changes, message)
+
+    monkeypatch.setattr(state.store, "commit", spy)
+    bookmark(client, full)
+    front = fm(site, BOOKMARK)
+    assert (front["bookmark_site"], front["bookmark_description"]) == (
+        "Adactio",
+        "A journal entry.",
+    )
+    assert front["bookmark_image"] == {
+        "file": "card.webp",
+        "alt": "A photo",
+        "width": 800,
+        "height": 419,
+    }
+    assert (site / CARD).read_bytes() == WEBP.content
+    assert commits == [([BOOKMARK, CARD], "create bookmark post")]
+    assert images.calls == [IMG]
+
+
+def test_the_card_image_has_a_media_row_linked_to_the_post(client, full, targets, images, state):
+    targets.metas[ADACTIO] = CARD_META
+    images.cards[IMG] = WEBP
+    bookmark(client, full)
+    (row,) = media_rows(state)
+    post = state.db.query("SELECT uid FROM posts")[0]["uid"]
+    assert (row["path"], row["url"], row["post_uid"]) == (CARD, BOOKMARK_URL + "card.webp", post)
+    assert (row["media_type"], row["content_type"]) == ("photo", "image/webp")
+
+
+def test_the_image_fetch_gets_what_is_left_of_the_budget(client, full, targets, images):
+    targets.metas[ADACTIO] = CARD_META
+    images.cards[IMG] = WEBP
+    bookmark(client, full)
+    assert 0 < images.timeouts[0] <= 12
+
+
+def test_a_page_without_an_image_gives_a_text_card(client, full, site, targets, images, state):
+    targets.metas[ADACTIO] = TargetMeta(site="Adactio", description="d")
+    bookmark(client, full)
+    front = fm(site, BOOKMARK)
+    assert front["bookmark_site"] == "Adactio" and "bookmark_image" not in front
+    assert images.calls == [] and media_rows(state) == []
+
+
+def test_an_image_that_cannot_be_used_gives_a_text_card(client, full, site, targets, images):
+    targets.metas[ADACTIO] = CARD_META  # the fake has no image for IMG
+    bookmark(client, full)
+    front = fm(site, BOOKMARK)
+    assert front["bookmark_site"] == "Adactio" and "bookmark_image" not in front
+    assert not (site / CARD).exists()
+
+
+def test_a_crashing_image_fetcher_never_blocks_posting(client, full, site, targets, state):
+    async def boom(*args, **kwargs):
+        raise RuntimeError("bug")
+
+    targets.metas[ADACTIO] = CARD_META
+    state.image_fetcher = boom
+    bookmark(client, full)
+    front = fm(site, BOOKMARK)
+    assert front["bookmark_site"] == "Adactio" and "bookmark_image" not in front
+
+
+def test_images_can_be_switched_off_alone(client, full, site, targets, images, state):
+    state.config.publication.fetch_target_image = False
+    targets.metas[ADACTIO] = CARD_META
+    images.cards[IMG] = WEBP
+    bookmark(client, full)
+    front = fm(site, BOOKMARK)
+    assert front["bookmark_site"] == "Adactio" and "bookmark_image" not in front
+    assert images.calls == [] and not (site / CARD).exists()
+
+
+def test_no_target_meta_means_no_card_at_all(client, full, site, targets, images, state):
+    state.config.publication.fetch_target_meta = False
+    bookmark(client, full)
+    assert targets.calls == [] and images.calls == []
+
+
+def test_a_flat_bookmark_gets_text_only(client, full, site, targets, images, state):
+    state.config.post_types["bookmark"].post.path = "content/bookmarks/2026/10/14/1910.md"
+    targets.metas[ADACTIO] = CARD_META
+    images.cards[IMG] = WEBP
+    bookmark(client, full)
+    front = fm(site, "content/bookmarks/2026/10/14/1910.md")
+    assert front["bookmark_site"] == "Adactio" and "bookmark_image" not in front
+    assert not list(site.rglob("card.webp"))
+
+
+def test_only_bookmarks_get_an_image(client, full, site, targets, images):
+    targets.metas[ADACTIO] = CARD_META
+    images.cards[IMG] = WEBP
+    make(client, full, **{"like-of": ADACTIO})
+    assert images.calls == []
+
+
+def test_an_edit_that_leaves_the_link_keeps_the_card(client, full, site, targets, images):
+    targets.metas[ADACTIO] = CARD_META
+    images.cards[IMG] = WEBP
+    url = bookmark(client, full)
+    assert update(client, full, url, replace={"content": ["hi"]}).status_code == 200
+    assert fm(site, BOOKMARK)["bookmark_image"]["width"] == 800
+    assert (site / CARD).read_bytes() == WEBP.content
+    assert targets.calls == [ADACTIO] and images.calls == [IMG]
+
+
+def test_changing_the_link_replaces_the_card_in_one_commit(
+    client, full, site, targets, images, state, monkeypatch
+):
+    targets.metas[ADACTIO] = CARD_META
+    targets.metas["https://two.example/b"] = TargetMeta(
+        site="Two", image_url="https://two.example/i.png"
+    )
+    images.cards[IMG] = WEBP
+    images.cards["https://two.example/i.png"] = WEBP_2
+    url = bookmark(client, full)
+    commits = []
+    original = state.store.commit
+
+    async def spy(changes, message):
+        commits.append(len(changes))
+        return await original(changes, message)
+
+    monkeypatch.setattr(state.store, "commit", spy)
+    update(client, full, url, replace={"bookmark-of": ["https://two.example/b"]})
+    front = fm(site, BOOKMARK)
+    assert front["bookmark_site"] == "Two" and "bookmark_description" not in front
+    assert front["bookmark_image"] == {"file": "card.webp", "alt": "", "width": 640, "height": 360}
+    assert (site / CARD).read_bytes() == WEBP_2.content
+    assert commits == [2]
+    (row,) = media_rows(state)
+    assert row["md5"] != ""
+
+
+def test_changing_the_link_to_a_page_with_no_image_removes_the_old_one(
+    client, full, site, targets, images, state
+):
+    targets.metas[ADACTIO] = CARD_META
+    images.cards[IMG] = WEBP
+    url = bookmark(client, full)
+    update(client, full, url, replace={"bookmark-of": ["https://two.example/b"]})
+    front = fm(site, BOOKMARK)
+    assert "bookmark_image" not in front and "bookmark_site" not in front
+    assert not (site / CARD).exists()
+    assert media_rows(state) == []
+
+
+def test_changing_the_link_drops_the_card_marker_too(client, full, site, targets, images):
+    targets.metas[ADACTIO] = CARD_META
+    url = bookmark(client, full)
+    update(client, full, url, replace={"bookmark-card": [{"result": "none"}], "content": ["x"]})
+    assert fm(site, BOOKMARK)["bookmark_card"] == {"result": "none"}
+    update(client, full, url, replace={"bookmark-of": ["https://two.example/b"]})
+    assert "bookmark_card" not in fm(site, BOOKMARK)
+
+
+def test_deleting_bookmark_image_removes_the_file_and_its_row(
+    client, full, site, targets, images, state
+):
+    targets.metas[ADACTIO] = CARD_META
+    images.cards[IMG] = WEBP
+    url = bookmark(client, full)
+    assert update(client, full, url, delete=["bookmark-image"]).status_code == 200
+    front = fm(site, BOOKMARK)
+    assert "bookmark_image" not in front and front["bookmark_site"] == "Adactio"
+    assert not (site / CARD).exists()
+    assert (site / BOOKMARK).exists()
+    assert media_rows(state) == []
+    assert targets.calls == [ADACTIO]  # nothing fetched again
+
+
+def test_moving_the_post_takes_the_card_along(client, full, site, targets, images, state):
+    targets.metas[ADACTIO] = CARD_META
+    images.cards[IMG] = WEBP
+    url = bookmark(client, full)
+    update(client, full, url, replace={"published": ["2026-10-15T10:00:00+02:00"]})
+    new = site / "content/bookmarks/2026/10/15/1000/card.webp"
+    assert new.read_bytes() == WEBP.content
+    assert not (site / CARD).exists()
+
+
 # --- backfill ------------------------------------------------------------------------------------
 async def test_backfill_fills_posts_that_lack_metadata(client, full, site, targets, state):
     make(client, full, **{"like-of": ADACTIO})
@@ -159,3 +373,20 @@ async def test_backfill_can_be_limited_to_one_type(client, full, site, targets, 
     report = await backfill_targets(state, delay=0, only_type="like")
     assert report.updated == 1
     assert "bookmark_author" not in fm(site, BOOKMARK)
+
+
+def test_card_keys_sit_next_to_bookmark_of(client, full, site, targets, images):
+    targets.metas[ADACTIO] = CARD_META
+    images.cards[IMG] = WEBP
+    bookmark(client, full, content="words")
+    keys = list(fm(site, BOOKMARK))
+    wanted = [
+        "bookmark_of",
+        "bookmark_author",
+        "bookmark_site",
+        "bookmark_description",
+        "bookmark_image",
+    ]
+    start = keys.index("bookmark_of")
+    assert keys[start + 1] == "basedomain"
+    assert [k for k in keys[start:] if k != "basedomain"] == wanted

@@ -119,7 +119,7 @@ post_types:
     name: Bookmark
     discovery: bookmark-of
     post:
-      path: content/bookmarks/{yyyy}/{MM}/{dd}/{slug}.md
+      path: content/bookmarks/{yyyy}/{MM}/{dd}/{slug}/index.md
       url: bookmarks/{yyyy}/{MM}/{dd}/{slug}/
     properties: [bookmark-of, name, content, category]
     required_properties: [bookmark-of]

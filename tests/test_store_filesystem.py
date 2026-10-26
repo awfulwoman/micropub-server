@@ -59,3 +59,11 @@ async def test_moving_prunes_the_old_directory(tmp_path):
     await s.commit([Put("old/index.md", b"1")], "m")
     await s.commit([Move("old/index.md", "new/index.md")], "m")
     assert not (tmp_path / "old").exists() and (tmp_path / "new" / "index.md").exists()
+
+
+async def test_deleting_a_bundle_file_keeps_the_bundle(tmp_path):
+    s = FileSystemStore(tmp_path)
+    await s.commit([Put("b/index.md", b"1"), Put("b/card.webp", b"2")], "m")
+    await s.commit([Put("b/index.md", b"3"), Delete("b/card.webp")], "m")
+    assert (tmp_path / "b" / "index.md").read_bytes() == b"3"
+    assert not (tmp_path / "b" / "card.webp").exists()

@@ -100,7 +100,7 @@ CONFIG = {
             "name": "Bookmark",
             "discovery": "bookmark-of",
             "post": {
-                "path": "content/bookmarks/{yyyy}/{MM}/{dd}/{HH}{mm}.md",
+                "path": "content/bookmarks/{yyyy}/{MM}/{dd}/{HH}{mm}/index.md",
                 "url": "bookmarks/{yyyy}/{MM}/{dd}/{HH}{mm}/",
             },
             "properties": ["bookmark-of", "name", "content"],
@@ -135,13 +135,32 @@ class FakeTargets:
         return self.metas.get(url, TargetMeta())
 
 
+class FakeImages:
+    """Stands in for the card image fetcher: answers from `cards`, records what was asked."""
+
+    def __init__(self):
+        self.cards = {}
+        self.calls = []
+        self.timeouts = []
+
+    async def __call__(self, url, resolver, card, timeout):
+        self.calls.append(url)
+        self.timeouts.append(timeout)
+        return self.cards.get(url)
+
+
 @pytest.fixture
 def targets():
     return FakeTargets()
 
 
 @pytest.fixture
-def state(tmp_path, site, targets):
+def images():
+    return FakeImages()
+
+
+@pytest.fixture
+def state(tmp_path, site, targets, images):
     cfg_data = {**CONFIG, "store": {"type": "filesystem", "directory": str(site)}}
     config = Config.model_validate(cfg_data)
     settings = Settings(
@@ -162,6 +181,7 @@ def state(tmp_path, site, targets):
         store=FileSystemStore(site),
         resolver=public_resolver,
         target_fetcher=targets,
+        image_fetcher=images,
     )
 
 

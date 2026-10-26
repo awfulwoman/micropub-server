@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import posixpath
 from dataclasses import dataclass
@@ -13,11 +14,12 @@ from zoneinfo import ZoneInfo
 from uuid_utils import uuid7
 
 from .app import AppState
+from .card_image import CARD_FILENAME
 from .deploys import record as record_deploy
 from .media import Processed
 from .posts import discover_post_type, normalise, render_template
 from .stores import Delete, Move, Put, StoreError
-from .target_enrich import enrich_props, refresh_props
+from .target_enrich import IMAGE_KEY, Card, card_image, enrich_props, refresh_props
 from .templates import render_post
 from .topics import MAX_TOPICS, topics_for_tags
 from .update import UpdateError, apply_update
@@ -224,6 +226,27 @@ async def _place_media(
     return changes, actions
 
 
+def _card_media(s: AppState, card: Card, post_path: str, page_url: str, post_uid: str):
+    """The card image as a store change plus the media row to record once it is committed."""
+    from .media_service import Prepared
+
+    image = card.image
+    processed = Processed(
+        image.content,
+        image.filename,
+        ".webp",
+        "photo",
+        "image/webp",
+        hashlib.md5(image.content).hexdigest(),
+    )
+    published = s.clock().isoformat(timespec="seconds")
+    path = posixpath.join(posixpath.dirname(post_path), CARD_FILENAME)
+    prepared = Prepared(
+        str(uuid7()), path, page_url + CARD_FILENAME, processed, published, False, False
+    )
+    return Put(path, image.content), ("insert", prepared, post_uid)
+
+
 async def create_post(
     s: AppState,
     jf2: dict[str, Any],
@@ -283,7 +306,7 @@ async def create_post(
         props["basedomain"] = base_domain(
             str(props["bookmark-of"])
         )  # the layout shows "Original link on ..."
-    await enrich_props(s, props)
+    card = await enrich_props(s, props)
 
     uid = str(uuid7())
     props["uid"] = uid  # so a {uuid} token in a path template works
@@ -295,6 +318,11 @@ async def create_post(
     props["post-status"] = "draft" if draft else props.get("post-status", "published")
 
     media_changes, media_actions = await _place_media(s, props, path, url, uploads, uid)
+    if card and path.endswith("/index.md"):  # the image needs a bundle; otherwise text only
+        props[IMAGE_KEY] = card.as_prop()
+        change, action = _card_media(s, card, path, url, uid)
+        media_changes.append(change)
+        media_actions.append(action)
 
     content = render_file(s, props)
     message = s.config.publication.commit_message.format(
@@ -458,6 +486,8 @@ async def update_post(
         now=s.clock(),
     )
     _set_topics(s, props, explicit_topics, derive="category" in touched)
+    if IMAGE_KEY in _keys(delete):  # an image the file had before the server knew of it
+        props.get("front-matter", {}).pop(IMAGE_KEY.replace("-", "_"), None)
     # An edit only changes a post's type if it changes what discovery says about it. Otherwise a
     # note with a title (which discovery calls an article) would jump sections on its first edit.
     # A title alone never counts: on this site notes may have titles too.
@@ -481,9 +511,15 @@ async def update_post(
         else:
             props.pop("basedomain", None)
 
-    await refresh_props(s, props, old)
-
+    card = await refresh_props(s, props, old)
     old_path, old_url = row["path"], row["url"]
+    bundle = old_path.endswith("/index.md")
+    had_image = bool(card_image(old))
+    if card and bundle:
+        props[IMAGE_KEY] = card.as_prop()
+    else:
+        card = None
+
     shape_changed = (
         post_type != row["post_type"]
         or props["slug"] != old.get("slug")
@@ -519,12 +555,37 @@ async def update_post(
 
     changes: list = [Move(old_path, new_path, content) if moved else Put(old_path, content)]
     media_rows = []
-    if moved and old_path.endswith("/index.md") and new_path.endswith("/index.md"):
+    media_rows_gone: list[str] = []
+    card_actions: list = []
+    # A new card replaces the old; an edit that left no image takes the old one away with it.
+    replace_card = bool(card) or (had_image and not card_image(props))
+    new_card_path = posixpath.join(posixpath.dirname(new_path), CARD_FILENAME)
+    stale = (
+        {posixpath.join(posixpath.dirname(old_path), CARD_FILENAME)}
+        if had_image and replace_card
+        else set()
+    )
+    keep_moving = moved and bundle and new_path.endswith("/index.md")
+    if bundle:
         new_dir = posixpath.dirname(new_path)
         for m in s.db.query("SELECT uid, path FROM media WHERE post_uid = ?", (row["uid"],)):
             name = posixpath.basename(m["path"])
-            changes.append(Move(m["path"], f"{new_dir}/{name}"))
-            media_rows.append((f"{new_dir}/{name}", new_url + name, m["uid"]))
+            if name == CARD_FILENAME and replace_card:
+                stale.add(m["path"])
+                media_rows_gone.append(m["uid"])
+            elif keep_moving:
+                changes.append(Move(m["path"], f"{new_dir}/{name}"))
+                media_rows.append((f"{new_dir}/{name}", new_url + name, m["uid"]))
+    if card:
+        stale.discard(new_card_path)  # written over in place
+        change, action = _card_media(s, card, new_path, new_url, row["uid"])
+        changes.append(change)
+        card_actions.append(action)
+    for path in sorted(stale):
+        if await s.store.exists(path):
+            changes.append(Delete(path))
+    from .media_service import record_media
+
     sha = await _commit(s, changes, _message(s, "update", post_type))
 
     with s.db.transaction():
@@ -546,6 +607,10 @@ async def update_post(
             s.db.execute(
                 "UPDATE media SET path = ?, url = ? WHERE uid = ?", (path, media_url, media_uid)
             )
+        for media_uid in media_rows_gone:
+            s.db.execute("DELETE FROM media WHERE uid = ?", (media_uid,))
+        for action in card_actions:
+            record_media(s, action[1], action[2])
         record_deploy(s, sha, row["uid"], "update")
     return Updated(url=new_url, changed=True, moved=moved or new_url != old_url)
 

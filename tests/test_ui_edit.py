@@ -105,7 +105,7 @@ def test_required_fields_are_enforced_when_editing_too(ui, site):
 def test_editing_a_bookmark_updates_its_domain(ui, site):
     post = make(ui, "bookmark", **{"bookmark-of": "https://www.one.example/a"})
     edit(ui, post, {"bookmark-of": "https://two.example/b"})
-    front, _ = fm(site, "content/bookmarks/2026/10/14/1910.md")
+    front, _ = fm(site, "content/bookmarks/2026/10/14/1910/index.md")
     assert front["bookmark_of"] == "https://two.example/b" and front["basedomain"] == "two.example"
 
 

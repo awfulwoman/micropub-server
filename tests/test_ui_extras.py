@@ -60,7 +60,7 @@ def test_share_creates_a_bookmark(ui, site):
             "name": "A page",
         },
     )
-    assert r.status_code == 303 and (site / "content/bookmarks/2026/10/14/1910.md").exists()
+    assert r.status_code == 303 and (site / "content/bookmarks/2026/10/14/1910/index.md").exists()
 
 
 def test_the_share_target_is_in_the_manifest(client):

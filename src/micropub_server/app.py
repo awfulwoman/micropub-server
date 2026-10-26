@@ -19,7 +19,8 @@ from starlette.routing import Route
 
 from .auth.client import Resolver, system_resolver
 from .auth.service import AuthService
-from .config import Config, PostType, Settings, SiteOverlay, Template
+from .card_image import CardImage, fetch_card
+from .config import Config, MediaCard, PostType, Settings, SiteOverlay, Template
 from .db import Database
 from .stores import Store, StoreError
 from .target_meta import TargetMeta, fetch_target_meta
@@ -37,6 +38,9 @@ class AppState:
     store: Store
     resolver: Resolver = system_resolver
     target_fetcher: Callable[[str, Resolver], Awaitable[TargetMeta]] = fetch_target_meta
+    image_fetcher: Callable[[str, Resolver, MediaCard, float], Awaitable[CardImage | None]] = (
+        fetch_card
+    )
     clock: Callable[[], datetime] = lambda: datetime.now(UTC)
     store_problem: str | None = None
     site: SiteOverlay | None = None
