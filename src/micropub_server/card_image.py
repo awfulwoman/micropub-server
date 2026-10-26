@@ -58,6 +58,10 @@ def process_card(data: bytes, card: MediaCard) -> CardImage | None:
     return CardImage(out.getvalue(), clean.width, clean.height)
 
 
+class ImageRetry(Exception):
+    """The image's server said to come back later (403, 429, 5xx), or did not answer in time."""
+
+
 async def _download(url: str, resolver: Resolver, max_bytes: int) -> bytes | None:
     """The body of an image, checking every redirect hop and stopping at max_bytes."""
     async with guarded_client(resolver, timeout=6, follow_redirects=False) as client:
@@ -68,7 +72,10 @@ async def _download(url: str, resolver: Resolver, max_bytes: int) -> bytes | Non
                 if response.is_redirect and response.headers.get("location"):
                     url = urljoin(url, response.headers["location"])
                     continue
-                if response.status_code != 200:
+                code = response.status_code
+                if code in (403, 429) or code >= 500:
+                    raise ImageRetry(f"{code} from {url}")
+                if code != 200:
                     return None
                 body = bytearray()
                 async for chunk in response.aiter_bytes():  # Content-Length is not trusted
@@ -86,10 +93,25 @@ async def fetch_card(
     timeout: float = TOTAL_TIMEOUT,
 ) -> CardImage | None:
     """Never raises: None means there is no image for the card."""
+    try:
+        return await fetch_card_or_retry(url, resolver, card, timeout)
+    except ImageRetry:
+        return None
+
+
+async def fetch_card_or_retry(
+    url: str,
+    resolver: Resolver = system_resolver,
+    card: MediaCard | None = None,
+    timeout: float = TOTAL_TIMEOUT,
+) -> CardImage | None:
+    """As fetch_card, but raises ImageRetry when trying again later may get the image."""
     card = card or MediaCard()
     try:
         async with asyncio.timeout(timeout):
             data = await _download(url, resolver, card.max_bytes)
-        return process_card(data, card) if data else None
-    except (FetchError, httpx.HTTPError, ValueError, TimeoutError):
+    except (httpx.TimeoutException, TimeoutError) as exc:
+        raise ImageRetry(f"timed out: {url}") from exc
+    except (FetchError, httpx.HTTPError, ValueError):
         return None
+    return process_card(data, card) if data else None

@@ -8,7 +8,7 @@ import pytest
 import respx
 from PIL import Image
 
-from micropub_server.backfill_cards import STEPS, backfill_archive, backfill_live
+from micropub_server.backfill_cards import STEPS, backfill_archive, backfill_images, backfill_live
 from micropub_server.cli import main
 from micropub_server.config import MediaCard
 
@@ -70,8 +70,8 @@ def page_route(router, url="https://a.example/x", **kw):
     return router.get(url).mock(**kw)
 
 
-def test_steps_include_live_and_archive():
-    assert STEPS == ("scraped", "live", "archive")
+def test_steps_include_live_archive_and_image():
+    assert STEPS == ("scraped", "live", "archive", "image")
 
 
 async def test_found_writes_keys_and_image_and_no_marker(tmp_path):
@@ -514,3 +514,69 @@ def test_cli_defaults_delay_by_step(monkeypatch, tmp_path):
         "2026-10-14",
     )
     assert seen["recheck"] is True and seen["image"] is False
+
+
+# --- the image step: a card with text but no image ----------------------------------------------
+async def images_step(root, kind="bookmark", **kw):
+    async def sleep(seconds):
+        pass
+
+    return await backfill_images(
+        root, CFG, kind=kind, resolver=resolver, sleep=sleep, delay=0, **kw
+    )
+
+
+TEXT_CARD = "bookmark_site: Mine\nbookmark_description: My words.\n"
+
+
+async def test_image_step_adds_only_the_image(tmp_path):
+    path = post(tmp_path, "a", extra=TEXT_CARD)
+    with respx.mock as router:
+        page_route(router, return_value=httpx.Response(200, html=PAGE))
+        router.get("https://a.example/pic.jpg").respond(200, content=jpeg())
+        report = await images_step(tmp_path)
+    assert report.found == 1
+    meta = front(path)
+    assert (meta["bookmark_site"], meta["bookmark_description"]) == ("Mine", "My words.")
+    assert meta["bookmark_image"]["file"] == "card.webp"
+    assert (path.parent / "card.webp").exists()
+
+
+async def test_image_step_moves_a_flat_file(tmp_path):
+    path = post(tmp_path, "x", extra=TEXT_CARD, bundle=False)
+    with respx.mock as router:
+        page_route(router, return_value=httpx.Response(200, html=PAGE))
+        router.get("https://a.example/pic.jpg").respond(200, content=jpeg())
+        await images_step(tmp_path)
+    moved = path.with_suffix("") / "index.md"
+    assert not path.exists() and front(moved)["bookmark_image"]["file"] == "card.webp"
+
+
+async def test_image_step_leaves_a_post_alone_without_an_image(tmp_path):
+    path = post(tmp_path, "a", extra=TEXT_CARD)
+    before = path.read_text()
+    with respx.mock as router:
+        page_route(router, return_value=httpx.Response(200, html=TEXT_ONLY))
+        report = await images_step(tmp_path)
+    assert report.none == 1 and path.read_text() == before
+
+
+async def test_image_step_lists_retries_and_writes_nothing(tmp_path):
+    path = post(tmp_path, "a", extra=TEXT_CARD)
+    before = path.read_text()
+    with respx.mock as router:
+        page_route(router, return_value=httpx.Response(200, html=PAGE))
+        router.get("https://a.example/pic.jpg").respond(429)
+        report = await images_step(tmp_path)
+    assert report.retry == 1 and report.retry_urls == ["https://a.example/x"]
+    assert path.read_text() == before
+
+
+async def test_image_step_skips_no_card_an_image_or_an_archived_card(tmp_path):
+    post(tmp_path, "none")
+    post(tmp_path, "img", extra=TEXT_CARD + "bookmark_image:\n  file: card.webp\n")
+    post(tmp_path, "arch", extra=TEXT_CARD + "bookmark_card_archived: https://web.archive.org/x\n")
+    with respx.mock as router:
+        route = page_route(router, return_value=httpx.Response(200, html=PAGE))
+        report = await images_step(tmp_path)
+    assert report.skipped == 3 and not route.called

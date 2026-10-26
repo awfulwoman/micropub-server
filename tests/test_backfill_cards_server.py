@@ -47,7 +47,7 @@ def commits(state, monkeypatch):
     original = state.store.commit
 
     async def spy(changes, message):
-        seen.append(([c.path for c in changes], message))
+        seen.append(([getattr(c, "path", None) or c.new_path for c in changes], message))
         return await original(changes, message)
 
     monkeypatch.setattr(state.store, "commit", spy)
@@ -241,3 +241,31 @@ async def test_scraped_is_refused_in_server_mode(state):
 def test_cli_refuses_scraped_without_a_checkout(capsys):
     assert main(["backfill-cards", "--step", "scraped"]) == 1
     assert "--checkout" in capsys.readouterr().err
+
+
+async def test_image_step_adds_the_image_to_a_text_card_and_moves_a_flat_post(
+    client, full, site, images, state, commits
+):
+    cfg = state.config.post_types["bookmark"].post
+    bundle_path, cfg.path = cfg.path, "content/bookmarks/2026/10/14/1910.md"
+    url = make(client, full, **{"bookmark-of": PAGE_URL, "name": "b", "bookmark-site": "Mine"})
+    cfg.path = bundle_path
+    images.cards[PIC] = WEBP
+    commits.clear()
+    with respx.mock as router:
+        router.get(PAGE_URL).respond(200, html=PAGE)
+        report = await run(state, "image")
+    assert (report.found, report.failed) == (1, 0)
+    front = fm(site, BOOKMARK)
+    assert front["bookmark_site"] == "Mine" and "bookmark_description" not in front
+    assert front["bookmark_image"]["file"] == "card.webp"
+    assert commits == [([BOOKMARK, CARD], "update bookmark post")]  # the moved post, its image
+    assert state.db.query("SELECT url FROM posts")[0]["url"] == url
+
+
+async def test_image_step_skips_posts_without_a_card(client, full, state):
+    bookmark(client, full, "https://b.example/y")  # no target meta, so no card
+    with respx.mock as router:
+        route = router.get("https://b.example/y").respond(200, html=PAGE)
+        report = await run(state, "image")
+    assert report.skipped == 1 and not route.called

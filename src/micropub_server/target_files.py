@@ -128,6 +128,26 @@ def add_card_to_front_matter(
     return "---\n" + "".join(lines[:j]) + added + "".join(lines[j:]) + text[end + 1 :]
 
 
+def add_image_to_front_matter(text: str, image: dict, kind: str = "bookmark") -> str | None:
+    """The post with `<kind>_image` added after its card text, or None if it has an image already.
+
+    The rest of the card is left as it is.
+    """
+    if not text.startswith("---\n") or (end := text.find("\n---\n", 3)) == -1:
+        return None
+    lines = text[4 : end + 1].splitlines(keepends=True)
+    key = f"{kind}_image"
+    if any(re.match(rf"{key}\s*:", line) for line in lines):
+        return None
+    j = _after_target(lines, kind)
+    for i, line in enumerate(lines):
+        if re.match(rf"({kind}_site|{kind}_description)\s*:", line):
+            j = _block_end(lines, i)
+    if j is None:
+        return None
+    return "---\n" + "".join(lines[:j]) + _dump(key, image) + "".join(lines[j:]) + text[end + 1 :]
+
+
 def _block_end(lines: list[str], start: int) -> int:
     """The index after the key at `start` and the lines that continue its value."""
     j = start + 1

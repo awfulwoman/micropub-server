@@ -170,10 +170,25 @@ def _backfill_cards(args) -> int:
             for key, value in props.items():
                 print(f"    {key}: {str(value)[:80]!r}")
         return 0
-    step = bc.backfill_live if args.step == "live" else bc.backfill_archive
     delay = args.delay
     if delay is None:
-        delay = bc.LIVE_DELAY if args.step == "live" else bc.ARCHIVE_DELAY
+        delay = bc.ARCHIVE_DELAY if args.step == "archive" else bc.LIVE_DELAY
+    if args.step == "image":
+        card = asyncio.run(
+            bc.backfill_images(
+                root,
+                MediaCard(),
+                kind=args.type,
+                dry_run=args.dry_run,
+                limit=args.limit,
+                since=args.since,
+                before=args.before,
+                delay=delay,
+            )
+        )
+        _print_card_report(card, "would: " if args.dry_run else "")
+        return 0
+    step = bc.backfill_live if args.step == "live" else bc.backfill_archive
     card = asyncio.run(
         step(
             root,
@@ -215,7 +230,7 @@ def _backfill_cards_server(args) -> int:
     if args.step in (None, "scraped"):
         print(
             "--step scraped needs --checkout: it reads the scraped/ files of a site checkout. "
-            "Without --checkout, use --step live or archive.",
+            "Without --checkout, use --step live, archive or image.",
             file=sys.stderr,
         )
         return 1
@@ -325,13 +340,14 @@ def main(argv: list[str] | None = None) -> int:
     cards.add_argument(
         "--checkout",
         help="a local checkout of the site repo; without it the posts in the database are "
-        "edited through the server (live and archive only)",
+        "edited through the server (live, archive and image only)",
     )
     cards.add_argument(
         "--step",
         choices=STEPS,
         help="scraped: the old scraped/ cards, no network; live: fetch each page; "
-        "archive: the Wayback Machine, for pages marked gone",
+        "archive: the Wayback Machine, for pages marked gone; "
+        "image: the image alone, for cards that have text but no image",
     )
     cards.add_argument(
         "--dry-run", action="store_true", help="show what would be written, change nothing"
