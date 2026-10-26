@@ -11,7 +11,6 @@ from .base import MediaFetcher, NotApplicable, SyndicationError
 from .text import URL_LENGTH, counted_length, hashtags, plain_text, truncate
 
 MAX_MEDIA = 4
-VISIBILITY = {"public", "unlisted", "private"}
 
 
 def build_status(props: dict[str, Any], *, limit: int = 500, include_permalink: bool = True) -> str:
@@ -111,12 +110,12 @@ class MastodonTarget:
             if reply and not self._same_instance(reply):
                 raise NotApplicable("a reply to a post on another site cannot be mirrored")
 
-            visibility = props.get("visibility")
+            # The post's own `visibility` is about the site (rss, private), not Mastodon.
             body: dict[str, Any] = {
                 "status": build_status(
                     props, limit=self.limit, include_permalink=self.include_permalink
                 ),
-                "visibility": visibility if visibility in VISIBILITY else self.visibility,
+                "visibility": self.visibility,
             }
             if reply:
                 body["in_reply_to_id"] = _status_id(reply)

@@ -109,6 +109,15 @@
   </fieldset>
   {% endif %}
 
+  {% set seen = values.get('visibility') or prefill.get('visibility', 'public') %}
+  <fieldset>
+    <legend>Visibility</legend>
+    {% for key, label in visibilities.items() %}
+    <label class="check"><input type="radio" name="visibility" value="{{ key }}"
+      {{ 'checked' if key == seen }}> {{ label }}</label>
+    {% endfor %}
+  </fieldset>
+
   <details>
     <summary>More options</summary>
     <label for="f-published">Publication time <span class="hint">leave empty for now</span></label>

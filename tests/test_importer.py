@@ -179,6 +179,22 @@ async def test_draft_flag(populated):
     assert row["post_status"] == "draft"
 
 
+async def test_visibility(state, site):
+    for day, extra in (
+        ("02", "visibility: private\nbuild:\n  list: never\n"),
+        ("03", "visibility: rss\n"),
+    ):
+        f = site / f"content/notes/2025/03/{day}/0900.md"
+        f.parent.mkdir(parents=True)
+        f.write_text(f"---\ndate: '2025-03-{day}T09:00:00+01:00'\n{extra}---\nx\n")
+    await run(state)
+    rows = posts(state)
+    hush = json.loads(rows["content/notes/2025/03/02/0900.md"]["properties"])
+    feed = json.loads(rows["content/notes/2025/03/03/0900.md"]["properties"])
+    assert hush["visibility"] == "private" and "build" not in hush.get("front-matter", {})
+    assert feed["visibility"] == "rss"
+
+
 async def test_bundle_attachments_are_recorded_as_media(populated):
     await run(populated)
     m = populated.db.query("SELECT * FROM media WHERE path LIKE '%/3289/a.jpg'")[0]

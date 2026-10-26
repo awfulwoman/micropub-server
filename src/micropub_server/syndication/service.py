@@ -43,6 +43,7 @@ def _next_waiting(s: AppState, source_url: str | None):
         return rows[0]
     rows = s.db.query(
         "SELECT * FROM posts WHERE deleted IS NULL AND post_status = 'published'"
+        " AND COALESCE(json_extract(properties, '$.visibility'), '') != 'private'"
         " AND json_array_length(json_extract(properties, '$.\"mp-syndicate-to\"')) > 0"
         " ORDER BY published ASC, uid ASC LIMIT 1"
     )
@@ -86,6 +87,8 @@ async def run_syndication(s: AppState, source_url: str | None = None) -> Result:
         return Result("No posts awaiting syndication")
     if row["post_status"] != "published":
         return Result(f"The post at {row['url']} is a draft and is not syndicated")
+    if props.get("visibility") == "private":
+        return Result(f"The post at {row['url']} is private and is not syndicated")
     if s.config.syndication.require_live and not await _is_live(s, row["url"]):
         return Result(
             f"The post at {row['url']} is not live yet, so it was left for later", url=row["url"]

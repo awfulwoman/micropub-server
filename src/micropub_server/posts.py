@@ -25,6 +25,9 @@ _MONTHS = [
     "July", "August", "September", "October", "November", "December",
 ]  # fmt: skip
 
+# Who sees a post besides its own URL: "rss" is feeds only, "private" is nowhere (public: not stored).
+VISIBILITY = {"rss", "private"}
+
 
 # --- helpers -----------------------------------------------------------------
 def _zone(tz: str, fallback: datetime | None = None):
@@ -192,6 +195,12 @@ def normalise(
         p["channel"] = list(dict.fromkeys(wanted)) or [channels[0]]
     else:
         p.pop("mp-channel", None)
+
+    # Public is the default and is not stored. "unlisted" is what Micropub clients send for private.
+    visibility = str(p.pop("visibility", "") or "").strip().lower()
+    visibility = {"unlisted": "private"}.get(visibility, visibility)
+    if visibility in VISIBILITY:
+        p["visibility"] = visibility
 
     p.setdefault("post-status", "published")
     return p

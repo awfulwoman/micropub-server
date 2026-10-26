@@ -228,3 +228,21 @@ def test_aliases_merge_with_imported_ones_without_duplicates():
     props = {"name": "Hi", "front-matter": {"aliases": ["/old/", "/posts/2026/10/14/hi/"]}}
     fm, _ = split(render_post(props, Template(), aliases=["/posts/2026/10/14/hi/"]))
     assert fm["aliases"] == ["/old/", "/posts/2026/10/14/hi/"]
+
+
+def test_rss_visibility():
+    fm, _ = split(render({"published": "2026-10-14T19:10:00+02:00", "visibility": "rss"}))
+    assert fm["visibility"] == "rss" and "build" not in fm
+
+
+def test_private_visibility_is_never_listed_by_hugo():
+    fm, _ = split(render({"published": "2026-10-14T19:10:00+02:00", "visibility": "private"}))
+    assert fm["visibility"] == "private" and fm["build"] == {"list": "never"}
+
+
+def test_public_post_drops_an_old_build_extra():
+    props = {
+        "published": "2026-10-14T19:10:00+02:00",
+        "front-matter": {"build": {"list": "never"}},
+    }
+    assert "build" not in split(render(props))[0]

@@ -421,3 +421,23 @@ def test_saving_without_touching_the_card_fetches_nothing(ui, carded, targets):
     post = make(ui, "bookmark", **{"bookmark-of": LINK, "name": "T"})
     edit(ui, post, {"bookmark-of": LINK, "name": "Changed"})
     assert targets.calls == [LINK]
+
+
+def test_visibility_is_chosen_and_changed_in_the_form(ui, site):
+    post = make(ui, content="x", visibility="rss")
+    assert fm(site, NOTE)[0]["visibility"] == "rss"
+    assert re.search(r'value="rss"\s+checked', ui.get(f"{post}/edit").text)
+    edit(ui, post, {"content": "x", "visibility": "private"})
+    front = fm(site, NOTE)[0]
+    assert front["visibility"] == "private" and front["build"] == {"list": "never"}
+    assert "private" in ui.get(post).text
+    edit(ui, post, {"content": "x", "visibility": "public"})
+    front = fm(site, NOTE)[0]
+    assert "visibility" not in front and "build" not in front
+
+
+def test_new_posts_are_public_by_default(ui, site):
+    html = ui.get("/posts/new/note").text
+    assert re.search(r'value="public"\s+checked', html)
+    make(ui, content="x")
+    assert "visibility" not in fm(site, NOTE)[0]

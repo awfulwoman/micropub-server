@@ -14,7 +14,7 @@ from .util import to_list
 # Keys never written to front matter, whatever the config says.
 _INTERNAL = {"type", "post-type", "post-status", "content", "front-matter"}
 _DATES = {"date", "lastmod", "expiryDate"}
-_FRONT = ["title", "date", "lastmod", "draft"]
+_FRONT = ["title", "date", "lastmod", "draft", "visibility", "build"]
 _TYPE_SPECIFIC = [
     "bookmark_of", "bookmark_author", "bookmark_site", "bookmark_description",
     "bookmark_image", "bookmark_card", "bookmark_card_archived",
@@ -83,6 +83,8 @@ def _build_front_matter(
 
     if props.get("post-status") == "draft":
         out["draft"] = True
+    if props.get("visibility") == "private":
+        out["build"] = {"list": "never"}  # Hugo leaves it out of every list, feed and the sitemap
 
     card = props.get("checkin")
     if isinstance(card, dict):
@@ -100,7 +102,8 @@ def _build_front_matter(
     extras = props.get("front-matter")
     if isinstance(extras, dict):
         for key, value in extras.items():
-            out.setdefault(key, value)
+            if key != "build":  # follows the visibility, set above
+                out.setdefault(key, value)
     if aliases:
         out["aliases"] = list(dict.fromkeys([*to_list(out.get("aliases")), *aliases]))
     return _order(out)

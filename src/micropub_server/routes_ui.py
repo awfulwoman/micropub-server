@@ -17,7 +17,15 @@ from starlette.staticfiles import StaticFiles
 from . import ui
 from .auth.passwords import verify_password
 from .deploys import build_label
-from .forms import LABELS, LINKS, PHOTO_SLOTS, build_post, type_fields, type_required
+from .forms import (
+    LABELS,
+    LINKS,
+    PHOTO_SLOTS,
+    VISIBILITY_LABELS,
+    build_post,
+    type_fields,
+    type_required,
+)
 from .http import state_of
 from .jf2 import jf2_to_mf2
 from .publish import (
@@ -163,6 +171,7 @@ def list_posts(s, filters: dict[str, str], after: str | None, before: str | None
                 "type_label": cfg.name if cfg else r["post_type"],
                 "published": r["published"],
                 "status": r["post_status"],
+                "visibility": props.get("visibility"),
                 "deleted": bool(r["deleted"]),
                 "waiting": bool(r["waiting"]),
                 "imported": r["source"] == "import",
@@ -266,6 +275,7 @@ async def _form_page(
         targets=[t.info for t in s.targets],
         tags=await get_categories(s),
         topics=list(s.topic_titles.items()) if s.topic_map else [],
+        visibilities=VISIBILITY_LABELS,
         error=error,
         errors=errors or {},
         values=values or {},
@@ -382,6 +392,7 @@ async def post_page(request: Request, session: dict[str, Any]) -> Response:
     ]
     details = [
         ("Status", "deleted" if deleted else row["post_status"]),
+        ("Visibility", VISIBILITY_LABELS[props.get("visibility") or "public"].split(":")[0]),
         ("Published", row["published"]),
         ("Updated", row["updated"] or "never"),
         ("Source", "imported from the site" if row["source"] == "import" else "created here"),
@@ -402,6 +413,7 @@ async def post_page(request: Request, session: dict[str, Any]) -> Response:
         title=_title(props, props.get("slug") or row["url"]),
         type_label=cfg.name if cfg else row["post_type"],
         deleted=deleted,
+        visibility=props.get("visibility"),
         preview_html=_clean_preview(html, row["url"]) if html else "",
         photos=photos,
         details=details,
@@ -438,6 +450,7 @@ def _prefill(s, props: dict[str, Any]) -> dict[str, Any]:
         "mp-slug": props.get("slug", ""),
         "syndicate": props.get("mp-syndicate-to") or [],
         "topic": [str(t) for t in props.get("topic") or _imported_topics(props)],
+        "visibility": props.get("visibility") or "public",
     }
     for link in LINKS:
         out[link] = props.get(link, "")
@@ -520,6 +533,8 @@ def _diff(
         replace["published"] = [new["published"]]
     if new.get("mp-slug") and new["mp-slug"] != prefill["mp-slug"]:
         replace["mp-slug"] = [new["mp-slug"]]
+    if new.get("visibility") != props.get("visibility"):
+        set_("visibility", new.get("visibility"), True, bool(new.get("visibility")))
     return replace, delete
 
 

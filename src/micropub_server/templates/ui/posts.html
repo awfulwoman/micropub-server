@@ -27,6 +27,7 @@
       <time datetime="{{ p.published }}">{{ p.published[:10] }}</time>
       {% if p.deleted %}<span class="badge deleted">deleted</span>{% endif %}
       {% if p.status == 'draft' %}<span class="badge draft">draft</span>{% endif %}
+      {% if p.visibility %}<span class="badge">{{ 'RSS only' if p.visibility == 'rss' else p.visibility }}</span>{% endif %}
       {% if p.waiting %}<span class="badge">waiting to share</span>{% endif %}
       {% if p.build and p.build.state != 'live' %}<span class="badge {{ 'danger' if p.build.state == 'failed' }}">{{ p.build.text }}</span>{% endif %}
       {% if p.imported %}<span class="badge">imported</span>{% endif %}

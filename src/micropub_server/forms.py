@@ -10,6 +10,7 @@ from starlette.datastructures import FormData, UploadFile
 
 from .config import Media, PostType
 from .media import MediaError, Processed, process_upload
+from .posts import VISIBILITY
 
 PHOTO_SLOTS = 4
 LINKS = {
@@ -28,6 +29,11 @@ LABELS = {
     "location": "Location",
     "checkin": "Place",
     "category": "Tags",
+}
+VISIBILITY_LABELS = {
+    "public": "Public: on the site's lists and in RSS",
+    "rss": "RSS only: in the feeds, not on the site's lists",
+    "private": "Private: listed nowhere, only reachable by its address",
 }
 ORDER = [*LINKS, "name", "content", "summary", "photo", "location", "checkin", "category"]
 
@@ -161,6 +167,8 @@ async def build_post(
         jf2["published"] = published
     if slug := text("mp-slug"):
         jf2["mp-slug"] = slug
+    if (visibility := text("visibility")) in VISIBILITY:
+        jf2["visibility"] = visibility
     if channel:
         jf2["mp-channel"] = channel
     if targets := [str(v) for v in form.getlist("syndicate") if v]:

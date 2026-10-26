@@ -191,6 +191,22 @@ def test_oldest_waiting_post_goes_first_and_drafts_never(client, mastodon, full,
     assert "older" in json.loads(status.calls[0].request.content)["status"]
 
 
+def test_private_posts_are_never_syndicated(client, mastodon, full, no_network):
+    url = make(client, full, content="hush", visibility="private", **{"mp-syndicate-to": UID})
+    status = mastodon_status(no_network)
+    assert "No posts awaiting" in syndicate(client, full).text
+    assert "private" in syndicate(client, full, source_url=url).text
+    assert not status.calls
+
+
+def test_rss_posts_are_syndicated_with_the_default_visibility(client, mastodon, full, no_network):
+    make(client, full, content="feed", visibility="rss", **{"mp-syndicate-to": UID})
+    live(no_network, NOTE_URL)
+    status = mastodon_status(no_network)
+    syndicate(client, full)
+    assert json.loads(status.calls[0].request.content)["visibility"] == "public"
+
+
 def test_a_specific_post_can_be_named(client, mastodon, full, no_network):
     make(
         client,

@@ -205,6 +205,10 @@ def _front_matter_to_jf2(
             }
     if fm.pop("draft", False) is True:
         props["post-status"] = "draft"
+    if "visibility" in fm:
+        props["visibility"] = str(fm.pop("visibility"))
+        if fm.get("build") == {"list": "never"}:
+            fm.pop("build")  # written again from the visibility
 
     if "images" in fm:
         photos = []

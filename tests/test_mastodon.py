@@ -147,12 +147,12 @@ async def test_posts_a_status_with_an_idempotency_key():
 
 
 @respx.mock
-async def test_visibility_follows_the_post_or_the_config():
+async def test_visibility_follows_the_config_not_the_post():
     route = respx.post(f"{API}/api/v1/statuses").respond(200, json={"url": "u"})
     await target().syndicate(
-        {"uid": "1", "url": PERMALINK, "content": "x", "visibility": "unlisted"}, no_media
+        {"uid": "1", "url": PERMALINK, "content": "x", "visibility": "rss"}, no_media
     )
-    assert json.loads(route.calls[0].request.content)["visibility"] == "unlisted"
+    assert json.loads(route.calls[0].request.content)["visibility"] == "public"
     await target(visibility="private").syndicate(
         {"uid": "2", "url": PERMALINK, "content": "x"}, no_media
     )

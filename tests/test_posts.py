@@ -222,3 +222,16 @@ def test_normalise_updated_is_converted_like_published():
     out = n({"updated": "2021-02-24T08:00:00.000Z"})
     assert out["updated"] == "2021-02-24T09:00:00+01:00"  # Berlin is on CET in February
     assert "updated" not in n({})
+
+
+@pytest.mark.parametrize(
+    ("given", "expected"),
+    [("rss", "rss"), ("RSS", "rss"), ("private", "private"), ("unlisted", "private")],
+)
+def test_normalise_visibility(given, expected):
+    assert n({"content": "x", "visibility": given})["visibility"] == expected
+
+
+@pytest.mark.parametrize("given", ["public", "", "nonsense"])
+def test_normalise_public_or_unknown_visibility_is_dropped(given):
+    assert "visibility" not in n({"content": "x", "visibility": given})
