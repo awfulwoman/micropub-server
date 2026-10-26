@@ -29,7 +29,7 @@ Built and tested:
   apps have access.
 - **Link-target facts**: when a like, quote or bookmark is posted, the title, author and (for
   tweets and toots) the oEmbed and original text of the linked page are saved in its front matter.
-  See [spec 06](docs/specs/06-post-templates.md#facts-about-the-link-target).
+  See [spec 06](https://github.com/awfulwoman/meta/blob/main/specs/micropub-server/06-post-templates.md#facts-about-the-link-target).
 - **A container image** (non-root, read-only filesystem) published to GHCR by CI, which smoke-tests
   the real image before pushing.
 
