@@ -146,22 +146,54 @@ def _backfill_targets(args) -> int:
 
 
 def _backfill_cards(args) -> int:
+    import asyncio
     from pathlib import Path
 
-    from .backfill_cards import backfill_scraped
+    from . import backfill_cards as bc
     from .config import MediaCard
 
     root = Path(args.checkout)
     if not (root / f"content/{args.type}s").is_dir():
         print(f"no content/{args.type}s in {root}", file=sys.stderr)
         return 1
-    report = backfill_scraped(root, MediaCard(), dry_run=args.dry_run, kind=args.type)
-    verb = "would convert" if args.dry_run else "converted"
-    print(f"{verb} {report.converted} (text only {report.no_image}), skipped {report.skipped}")
-    for path, props in report.changes:
-        print(f"  {path}")
-        for key, value in props.items():
-            print(f"    {key}: {str(value)[:80]!r}")
+    if args.step == "scraped":
+        report = bc.backfill_scraped(root, MediaCard(), dry_run=args.dry_run, kind=args.type)
+        verb = "would convert" if args.dry_run else "converted"
+        print(f"{verb} {report.converted} (text only {report.no_image}), skipped {report.skipped}")
+        for path, props in report.changes:
+            print(f"  {path}")
+            for key, value in props.items():
+                print(f"    {key}: {str(value)[:80]!r}")
+        return 0
+    step = bc.backfill_live if args.step == "live" else bc.backfill_archive
+    delay = args.delay
+    if delay is None:
+        delay = bc.LIVE_DELAY if args.step == "live" else bc.ARCHIVE_DELAY
+    card = asyncio.run(
+        step(
+            root,
+            MediaCard(),
+            kind=args.type,
+            dry_run=args.dry_run,
+            limit=args.limit,
+            since=args.since,
+            before=args.before,
+            recheck=args.recheck,
+            image=not args.no_image,
+            delay=delay,
+        )
+    )
+    prefix = "would: " if args.dry_run else ""
+    print(
+        f"{prefix}found {card.found}, gone {card.gone}, none {card.none}, embed {card.embed}, "
+        f"retry {card.retry}, skipped {card.skipped}"
+    )
+    for path, props in card.changes:
+        print(f"  {path}: {', '.join(props)}")
+    if card.retry_urls:
+        print("retry these:")
+        for url in card.retry_urls:
+            print(f"  {url}")
     return 0
 
 
@@ -247,10 +279,25 @@ def main(argv: list[str] | None = None) -> int:
         "--step",
         required=True,
         choices=STEPS,
-        help="scraped: the old scraped/ cards, with no network",
+        help="scraped: the old scraped/ cards, no network; live: fetch each page; "
+        "archive: the Wayback Machine, for pages marked gone",
     )
     cards.add_argument(
         "--dry-run", action="store_true", help="show what would be written, change nothing"
+    )
+    cards.add_argument("--limit", type=int, help="fetch at most this many pages")
+    cards.add_argument("--since", type=int, metavar="YYYY", help="only posts from this year on")
+    cards.add_argument("--before", metavar="YYYY-MM-DD", help="only posts dated before this day")
+    cards.add_argument(
+        "--recheck", action="store_true", help="ignore the bookmark_card marker for this run"
+    )
+    cards.add_argument(
+        "--no-image", action="store_true", help="save the text facts only, no card.webp"
+    )
+    cards.add_argument(
+        "--delay",
+        type=float,
+        help="seconds between requests (default 1 for live, 4 for archive)",
     )
     cards.set_defaults(func=_backfill_cards)
     args = parser.parse_args(argv)

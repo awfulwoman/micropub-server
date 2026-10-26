@@ -289,13 +289,16 @@ async def _get(client: httpx.AsyncClient, url: str, resolver: Resolver, accept: 
     raise FetchError("too many redirects")
 
 
-async def _fetch(url: str, resolver: Resolver) -> TargetMeta:
+async def _fetch(url: str, resolver: Resolver, status: dict | None = None) -> TargetMeta:
+    """`status`, if given, gets "code" (the page's HTTP status, else the embed endpoint's)."""
+    status = {} if status is None else status
     meta = TargetMeta()
     html = ""
     on_twitter = (urlsplit(url).hostname or "").removeprefix("www.") in _TWITTER_HOSTS
     async with guarded_client(resolver, timeout=6, follow_redirects=False) as client:
         if not on_twitter:  # the page itself is empty without scripts
             response = await _get(client, url, resolver, "text/html")
+            status["code"] = response.status_code
             if response.status_code == 200 and "html" in response.headers.get("content-type", ""):
                 html = response.text[:MAX_PAGE_CHARS]
                 meta = extract_page(html, url)
@@ -303,6 +306,7 @@ async def _fetch(url: str, resolver: Resolver) -> TargetMeta:
         if endpoint and endpoint.startswith("https://"):
             try:  # a missing embed must not lose the title and author already found
                 response = await _get(client, endpoint, resolver, "application/json")
+                status.setdefault("code", response.status_code)
                 data = response.json() if response.status_code == 200 else None
             except (FetchError, httpx.HTTPError, ValueError):
                 data = None

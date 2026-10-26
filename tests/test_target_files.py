@@ -95,3 +95,52 @@ def test_like_card_keys_go_after_like_author():
         "like_site: S\nlike_description: D\nlike_text: x\n---\n"
     )
     assert add_card_to_front_matter(out, {"like_site": "S"}, "like") is None
+
+
+MARKED = (
+    "---\nbookmark_of: https://x.org/\nbookmark_author: A\n"
+    "bookmark_card:\n  result: gone\n  checked: 2026-10-01\ntags:\n  - x\n---\nBody\n"
+)
+PLAIN = "---\nbookmark_of: https://x.org/\nbookmark_author: A\ntags:\n  - x\n---\nBody\n"
+
+
+def test_marker_goes_after_the_target_keys_and_nothing_else_changes():
+    from micropub_server.target_files import set_card_marker
+
+    out = set_card_marker(PLAIN, "bookmark", "gone", "2026-10-01")
+    assert out == MARKED
+
+
+def test_marker_is_replaced_in_place_and_removed_cleanly():
+    from micropub_server.target_files import set_card_marker
+
+    assert set_card_marker(MARKED, "bookmark", "none", "2026-10-26") == MARKED.replace(
+        "gone", "none"
+    ).replace("2026-10-01", "2026-10-26")
+    assert set_card_marker(MARKED, "bookmark", None) == PLAIN
+
+
+def test_marker_needs_a_front_matter_and_a_target_line():
+    from micropub_server.target_files import set_card_marker
+
+    assert set_card_marker("no front matter", "bookmark", "gone", "2026-10-01") is None
+    assert set_card_marker("---\ntags: x\n---\n", "bookmark", "gone", "2026-10-01") is None
+
+
+def test_archived_url_follows_the_image_and_like_marker_uses_like_keys():
+    from micropub_server.target_files import add_card_to_front_matter, set_card_marker
+
+    card = {
+        "bookmark_site": "X",
+        "bookmark_card_archived": "https://web.archive.org/web/2014/https://x.org/",
+    }
+    out = add_card_to_front_matter(PLAIN, card)
+    assert (
+        "bookmark_site: X\nbookmark_card_archived: https://web.archive.org/web/2014/https://x.org/\ntags:"
+        in out
+    )
+    like = "---\nlike_of: https://a.example/\ndate: 'x'\n---\n"
+    assert set_card_marker(like, "like", "none", "2026-10-26") == (
+        "---\nlike_of: https://a.example/\nlike_card:\n  result: none\n  checked: 2026-10-26\n"
+        "date: 'x'\n---\n"
+    )

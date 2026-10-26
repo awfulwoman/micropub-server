@@ -64,16 +64,55 @@ def card_keys(kind: str) -> tuple[str, ...]:
     return tuple(f"{kind}_{name}" for name in ("site", "description", "image"))
 
 
+def _after_target(lines: list[str], kind: str) -> int | None:
+    """Where new card lines go: after `<kind>_of` and the title, author and card keys that follow."""
+    target = next((n for n, line in enumerate(lines) if re.match(rf"{kind}_of\s*:", line)), None)
+    if target is None:
+        return None
+    j = _block_end(lines, target)
+    after = rf"{kind}_(title|author|site|description|image|card_archived)\s*:"
+    while j < len(lines) and re.match(after, lines[j]):
+        j = _block_end(lines, j)
+    return j
+
+
+def set_card_marker(text: str, kind: str, result: str | None, checked: str = "") -> str | None:
+    """The post with its `<kind>_card` marker set (`gone` or `none`) or, if result is None, removed.
+
+    Whatever else is in the file stays byte for byte. None if there is no front matter or no
+    `<kind>_of` line to put it after.
+    """
+    if not text.startswith("---\n"):
+        return None
+    end = text.find("\n---\n", 3)
+    if end == -1:
+        return None
+    lines = text[4 : end + 1].splitlines(keepends=True)
+    at = next((n for n, line in enumerate(lines) if re.match(rf"{kind}_card\s*:", line)), None)
+    if at is not None:
+        del lines[at : _block_end(lines, at)]
+    else:
+        at = _after_target(lines, kind)
+        if at is None:
+            return None
+    if result:
+        lines[at:at] = [f"{kind}_card:\n", f"  result: {result}\n", f"  checked: {checked}\n"]
+    return "---\n" + "".join(lines) + text[end + 1 :]
+
+
 def add_card_to_front_matter(
     text: str, card: dict[str, str | dict], kind: str = "bookmark"
 ) -> str | None:
     """The post with the link card keys added, or None if there is nothing to do.
 
-    The keys (`<kind>_site`, `<kind>_description`, `<kind>_image`, the last a mapping) go after
-    `<kind>_of`, `<kind>_title` and `<kind>_author`. A post that has any card key is never touched.
+    The keys (`<kind>_site`, `<kind>_description`, `<kind>_image`, the last a mapping, then
+    `<kind>_card_archived`) go after `<kind>_of`, `<kind>_title` and `<kind>_author`. A post that
+    has any card key is never touched.
     """
     keys = card_keys(kind)
-    wanted = [(key, card[key]) for key in keys if card.get(key)]
+    wanted = [(key, card[key]) for key in (*keys, f"{kind}_card_archived") if card.get(key)]
+    if not any(card.get(key) for key in keys):
+        return None
     if not wanted or not text.startswith("---\n"):
         return None
     end = text.find("\n---\n", 3)
@@ -82,12 +121,9 @@ def add_card_to_front_matter(
     lines = text[4 : end + 1].splitlines(keepends=True)
     if any(re.match(rf"({'|'.join(keys)})\s*:", line) for line in lines):
         return None
-    target = next((n for n, line in enumerate(lines) if re.match(rf"{kind}_of\s*:", line)), None)
-    if target is None:
+    j = _after_target(lines, kind)
+    if j is None:
         return None
-    j = _block_end(lines, target)
-    while j < len(lines) and re.match(rf"{kind}_(title|author)\s*:", lines[j]):
-        j = _block_end(lines, j)
     added = "".join(_dump(key, value) for key, value in wanted)
     return "---\n" + "".join(lines[:j]) + added + "".join(lines[j:]) + text[end + 1 :]
 
